@@ -8,9 +8,8 @@
 
 ## 核心玩法
 
-<img width="1259" height="2239" alt="1-10beijing" src="https://github.com/user-attachments/assets/0c523c00-0f24-4e07-9d6f-b44dfc024811" />
+<img width="1600" height="900" alt="image" src="https://github.com/user-attachments/assets/46072ecc-7c35-41dc-ac97-367e8dc04438" />
 
-<img width="1259" height="2239" alt="1-10beijing" src="https://github.com/user-attachments/assets/b5809e0e-d016-4e80-b978-c7d7a83b61dd" />
 
 <img width="1600" height="900" alt="image" src="https://github.com/user-attachments/assets/13f1a988-70dd-40c2-9fa9-7cdccf675c87" />
 
@@ -21,13 +20,6 @@
 <img width="1600" height="900" alt="image" src="https://github.com/user-attachments/assets/d4c6b88a-bb31-444d-8b88-8769af21d785" />
 
 
-<img width="1600" height="900" alt="image" src="https://github.com/user-attachments/assets/f86114ee-f43c-4477-9075-669184960df9" />
-
-<img width="1600" height="900" alt="image" src="https://github.com/user-attachments/assets/d0dbce49-3415-4465-917c-e8ff63fa385f" />
-
-<img width="1600" height="900" alt="image" src="https://github.com/user-attachments/assets/f4762e6b-44f4-4f65-ad15-b57f84ad5edd" />
-
-<img width="1600" height="900" alt="image" src="https://github.com/user-attachments/assets/ea92ab41-c87f-4730-99f3-8240a457b5e9" />
 
 
 
