@@ -1,0 +1,2447 @@
+import pygame
+import sys
+import os
+import cv2
+import math
+import time
+import warnings
+import random
+from itertools import combinations
+
+# ====================== 调试专用：修改此值即可设置初始进度 ======================
+DEBUG_INIT_PROGRESS = 10
+# 0 = 从开场开始
+# 1~10 = 第一章
+# 11~20 = 第二章
+# 21~30 = 第三章
+
+# ====================== 游戏常量 ======================
+SCREEN_WIDTH = 450
+SCREEN_HEIGHT = 800
+
+# 基础棋盘参数
+BASE_CELL_SIZE = 40
+BOARD_COLS = 10
+DEFAULT_BOARD_ROWS = 10
+SPECIAL_LEVEL1_10_ROWS = 5
+
+# 颜色定义
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GRAY = (200, 200, 200)
+LIGHT_GRAY = (240, 240, 240)
+DARK_GRAY = (150, 150, 150)
+BLACK_FADE = (0, 0, 0, 80)
+ERROR_FADE = (255, 0, 0, 80)
+WHITE_FADE = (255, 255, 255, 80)
+RED = (220, 60, 60)
+GREEN = (60, 160, 90)
+DARK_BLUE = (0, 51, 102)
+BLACK_BG = (0, 0, 0, 180)
+BROWN = (139, 69, 19)
+INK_BLACK = (30, 30, 30)
+INK_BG = (255, 253, 245, 220)
+LOCKED_GRAY = (100, 100, 100)
+SKY_BLUE = (180, 220, 255)
+PALE_YELLOW = (250, 244, 210)
+
+# 按钮尺寸
+BUTTON_WIDTH = 120
+BUTTON_HEIGHT = 40
+CHOOSE_BTN_WIDTH = 100
+CHOOSE_BTN_HEIGHT = 45
+CHOOSE_BTN_GAP = 50
+
+# 路径配置
+ANIMATION_PATH = r"C:\Users\hongd\Desktop\4C\begin animation.mp4"
+ANIMATION_BGM_PATH = r"C:\Users\hongd\Desktop\4C\begin animation.mp3"
+SKIP_TEXT = "点击任意位置跳过动画"
+
+GAME_BGM_PATH = r"C:\Users\hongd\Desktop\4C\backmusic1.mp3"
+GAME_BGM_PATH2 = r"C:\Users\hongd\Desktop\4C\backmusic2.mp3"
+GAME_BGM_PATH3 = r"C:\Users\hongd\Desktop\4C\backmusic3.mp3"
+
+BACKGROUND_VIDEO_PATH = r"C:\Users\hongd\Desktop\4C\background1.mp4"
+BACKGROUND_VIDEO_PATH2 = r"C:\Users\hongd\Desktop\4C\background2.mp4"
+BACKGROUND_VIDEO_PATH3 = r"C:\Users\hongd\Desktop\4C\background3.mp4"
+
+CHESS_ANIM_DIR = r"C:\Users\hongd\Desktop\4C\qizi1"
+CHESS_ANIM_DIR2 = r"C:\Users\hongd\Desktop\4C\qizi2"
+CHESS_ANIM_DIR3 = r"C:\Users\hongd\Desktop\4C\qizi3"
+CHESS_ANIM_FRAMES = 16
+CHESS_ANIM_DELAY = 0.05
+CHESS_ANIM_DELAY3 = 0.05
+
+BOX_FRAMES_DIR = r"C:\Users\hongd\Desktop\4C\kuang1"
+BOX_ANIM_DELAY = 0.05
+BOX_TOTAL_FRAMES = 16
+
+MAP_PATH = r"C:\Users\hongd\Desktop\4C\map.mp4"
+MAP_BGM_PATH = r"C:\Users\hongd\Desktop\4C\map.wav"
+
+# 训练模式图标
+LINGJING_IMG_PATH = r"C:\Users\hongd\Desktop\4C\lingjing.png"
+MINGXIANG_IMG_PATH = r"C:\Users\hongd\Desktop\4C\mingxiang.png"
+TIANDING_IMG_PATH = r"C:\Users\hongd\Desktop\4C\tianding.png"
+
+# 角色图片路径
+SHIFU_IMG_PATH = r"C:\Users\hongd\Desktop\4C\shifu.png"
+ZHUJUE_IMG_PATH = r"C:\Users\hongd\Desktop\4C\zhujue.png"
+YUFU_IMG_PATH = r"C:\Users\hongd\Desktop\4C\yufu.png"
+SHANZEI_IMG_PATH = r"C:\Users\hongd\Desktop\4C\shanzei.png"
+XINGSHANG_IMG_PATH = r"C:\Users\hongd\Desktop\4C\xingshang.png"
+
+# 第三章新增
+SHOUSHANG_ZHUJUE_IMG_PATH = r"C:\Users\hongd\Desktop\4C\shoushangzhujue.png"
+TIANZI_IMG_PATH = r"C:\Users\hongd\Desktop\4C\tianzi.png"
+SHIBING_IMG_PATH = r"C:\Users\hongd\Desktop\4C\shibing.png"
+PANJUNSHOULING_IMG_PATH = r"C:\Users\hongd\Desktop\4C\panjunshouling.png"
+
+NO_ROLE_IMG = None
+
+# BGM音量
+MIN_VOLUME = 0.8
+MAX_VOLUME = 0.8
+
+# 游戏状态
+STATE_ANIMATION = -1
+STATE_STORY = -3
+STATE_MAP = -2
+STATE_CHOOSE_ROLE = -4
+STATE_PLACE_BOX = 0
+STATE_PLACE_CHESS = 1
+STATE_PLAY_BOX_VIDEO = 2
+STATE_PLAY_CHESS_VIDEO = 3
+STATE_GAME_OVER = 4
+STATE_POST_WIN_STORY = 5
+STATE_MAP_TRANSITION = -5
+STATE_MINGXIANG_INFO = -6
+
+# 音乐场景
+MUSIC_SCENE_NONE = "none"
+MUSIC_SCENE_ANIMATION = "animation"
+MUSIC_SCENE_GAME = "game"
+MUSIC_SCENE_MAP = "map"
+
+# 模式
+MODE_STORY = "story"
+MODE_LINGJING = "lingjing"
+MODE_MINGXIANG = "mingxiang"
+
+# 地图文字配置
+TEXT_FONT_SIZE = 24
+TEXT_FONT_SIZE_HOVER = TEXT_FONT_SIZE + 3
+TEXT_LIFE_JIANGHU = "生死江湖"
+TEXT_STREET = "街巷阡陌"
+TEXT_PALACE = "飘摇皇庭"
+
+# 章节配置
+CHAPTER_LIFE_JIANGHU = 1
+CHAPTER_STREET = 2
+CHAPTER_PALACE = 3
+MAX_LEVEL_PER_CHAPTER = 10
+
+# 过渡动画
+TRANSITION_DURATION = 2.0
+SCALE_FACTOR = 5.0
+
+
+class TwoCharGame:
+    def __init__(self):
+        pygame.init()
+        pygame.mixer.init(frequency=44100, size=-16, channels=4, buffer=1024)
+
+        self.animation_channel = pygame.mixer.Channel(0)
+        self.game_channel = pygame.mixer.Channel(1)
+        self.map_channel = pygame.mixer.Channel(2)
+        self.extra_channel = pygame.mixer.Channel(3)
+
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        pygame.display.set_caption("二字棋（手机适配）")
+        self.clock = pygame.time.Clock()
+
+        self.mode = MODE_STORY
+        self.state = STATE_ANIMATION
+
+        # 字体
+        self.font = pygame.font.SysFont("KaiTi", 20)
+        self.big_font = pygame.font.SysFont("KaiTi", 32)
+        self.text_font_normal = pygame.font.SysFont("KaiTi", TEXT_FONT_SIZE)
+        self.text_font_hover = pygame.font.SysFont("KaiTi", TEXT_FONT_SIZE_HOVER, bold=True)
+        self.story_font = pygame.font.SysFont("KaiTi", 24)
+        self.choose_font = pygame.font.SysFont("KaiTi", 28)
+        self.count_font = pygame.font.SysFont("KaiTi", 16)
+        self.small_font = pygame.font.SysFont("KaiTi", 12)
+
+        self.current_music_scene = None
+
+        # ====================== 左上角图标参数（恢复到 75%） ======================
+        self.icon_size = 34
+        self.icon_gap = 15
+        self.icon_left = 12
+        self.icon_top = 12
+        self.lingjing_rect = pygame.Rect(self.icon_left, self.icon_top, self.icon_size, self.icon_size)
+        self.mingxiang_rect = pygame.Rect(
+            self.icon_left,
+            self.icon_top + self.icon_size + self.icon_gap,
+            self.icon_size,
+            self.icon_size
+        )
+        self.tianding_rect = pygame.Rect(
+            self.icon_left,
+            self.icon_top + 2 * (self.icon_size + self.icon_gap),
+            self.icon_size,
+            self.icon_size
+        )
+
+        # 背景视频
+        self.bg_video_cap = cv2.VideoCapture(BACKGROUND_VIDEO_PATH)
+        self.bg_video_cap2 = cv2.VideoCapture(BACKGROUND_VIDEO_PATH2)
+        self.bg_video_cap3 = cv2.VideoCapture(BACKGROUND_VIDEO_PATH3)
+
+        self.bg_video_fps = self.bg_video_cap.get(cv2.CAP_PROP_FPS)
+        self.bg_video_fps2 = self.bg_video_cap2.get(cv2.CAP_PROP_FPS)
+        self.bg_video_fps3 = self.bg_video_cap3.get(cv2.CAP_PROP_FPS)
+
+        self.bg_frame_interval = 1.0 / self.bg_video_fps if self.bg_video_fps > 0 else 1.0 / 30
+        self.bg_frame_interval2 = 1.0 / self.bg_video_fps2 if self.bg_video_fps2 > 0 else 1.0 / 30
+        self.bg_frame_interval3 = 1.0 / self.bg_video_fps3 if self.bg_video_fps3 > 0 else 1.0 / 30
+
+        self.last_bg_frame_time = time.time()
+        self.bg_surf = None
+
+        # 入场动画
+        self.animation_cap = cv2.VideoCapture(ANIMATION_PATH)
+        self.animation_skip = False
+        self.animation_fps = self.animation_cap.get(cv2.CAP_PROP_FPS)
+        if self.animation_fps <= 0:
+            self.animation_fps = 30
+
+        # 地图视频
+        self.map_cap = cv2.VideoCapture(MAP_PATH)
+
+        # 音乐
+        self.animation_bgm = pygame.mixer.Sound(ANIMATION_BGM_PATH)
+        self.game_bgm = pygame.mixer.Sound(GAME_BGM_PATH)
+        self.game_bgm2 = pygame.mixer.Sound(GAME_BGM_PATH2)
+        self.game_bgm3 = pygame.mixer.Sound(GAME_BGM_PATH3)
+        self.map_bgm = pygame.mixer.Sound(MAP_BGM_PATH)
+
+        # 章节 & 关卡
+        self.current_chapter = CHAPTER_LIFE_JIANGHU
+        self.current_level = 1
+
+        self.chapter_progress = {
+            CHAPTER_LIFE_JIANGHU: 1,
+            CHAPTER_STREET: 1,
+            CHAPTER_PALACE: 1
+        }
+
+        self.life_jianghu_finished = False
+        self.street_finished = False
+        self.palace_finished = False
+
+        self.init_debug_progress()
+
+        self.board_rows = DEFAULT_BOARD_ROWS
+        self.update_board_params()
+
+        # 动画帧
+        self.chess_anim_frames = self.load_chess_animation_frames()
+        self.current_chess_frame = 0
+        self.chess_anim_start_time = 0
+        self.chess_anim_pos = (0, 0)
+
+        self.box_frames = self.load_box_animation_frames()
+        self.current_box_frame = 0
+        self.box_anim_start_time = 0
+        self.box_anim_pos = (0, 0)
+
+        # 剧情
+        self.chapter_stories = self.init_chapter_stories()
+        self.post_win_stories = self.init_post_win_stories()
+        self.current_story_idx = 0
+        self.current_post_win_story = []
+        self.current_post_win_story_idx = 0
+
+        # 角色图片
+        self.role_images = self.load_role_images()
+
+        # 天气/地气背景图
+        self.tianqi_img = pygame.image.load(r"C:\Users\hongd\Desktop\4C\tianqi.png").convert_alpha()
+        self.diqi_img = pygame.image.load(r"C:\Users\hongd\Desktop\4C\diqi.png").convert_alpha()
+
+        # 训练图标
+        self.training_icons = self.load_training_icons()
+
+        # 游戏变量
+        self.rounds = 1
+        self.winner = None
+        self.box_anchors = set()
+        self.box_cells_all = set()
+        self.chess = []
+        self.chess_step = 0
+        self.ghost_pos = None
+        self.waiting_box_pos = None
+        self.waiting_chess_pos = None
+        self.reward_given = False
+
+        # 人机相关
+        self.current_role = None
+        self.ai_role = None
+        self.player_won = None
+        self.ai_action_started_at = None
+
+        # 教程关（第一章第一关）专用
+        self.return_state_after_anim = None
+        self.animation_tutorial_mode = False
+        self.tutorial_box1_started = False
+        self.tutorial_box1_done = False
+        self.tutorial_box2_started = False
+        self.tutorial_box2_done = False
+        self.tutorial_player_chess_done = 0
+
+        # 按钮
+        self.map_btn_rect = pygame.Rect(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT)
+        self.rematch_btn_rect = pygame.Rect(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT)
+        self.back_map_btn_rect = pygame.Rect(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT)
+        self.mingxiang_ok_rect = pygame.Rect(0, 0, 100, 40)
+        self.update_button_positions()
+
+        # 计数
+        self.weather_count = 0
+        self.qi_count = 0
+
+        # 角色选择按钮
+        self.gongfa_btn_rect = pygame.Rect(
+            (SCREEN_WIDTH - 2 * CHOOSE_BTN_WIDTH - CHOOSE_BTN_GAP) // 2,
+            SCREEN_HEIGHT // 2 + 20,
+            CHOOSE_BTN_WIDTH,
+            CHOOSE_BTN_HEIGHT
+        )
+        self.shouyu_btn_rect = pygame.Rect(
+            self.gongfa_btn_rect.right + CHOOSE_BTN_GAP,
+            SCREEN_HEIGHT // 2 + 20,
+            CHOOSE_BTN_WIDTH,
+            CHOOSE_BTN_HEIGHT
+        )
+
+        # 地图过渡
+        self.transition_start_time = 0.0
+        self.transition_click_pos = (0, 0)
+        self.transition_target_chapter = CHAPTER_LIFE_JIANGHU
+        self.transition_map_surface = None
+
+        # 天顶提示
+        self.tianding_tip_text = ""
+        self.tianding_tip_until = 0
+
+    # ====================== 基础工具 ======================
+
+    def is_training_mode(self):
+        return self.mode in [MODE_LINGJING, MODE_MINGXIANG]
+
+    def is_story_mode(self):
+        return self.mode == MODE_STORY
+
+    def using_plain_training_theme(self):
+        return self.mode in [MODE_LINGJING, MODE_MINGXIANG]
+
+    def get_training_bg_color(self):
+        if self.mode == MODE_LINGJING:
+            return SKY_BLUE
+        elif self.mode == MODE_MINGXIANG:
+            return PALE_YELLOW
+        return WHITE
+
+    def get_current_bg_config(self, target_chapter=None):
+        chapter = target_chapter if target_chapter is not None else self.current_chapter
+        if chapter == CHAPTER_STREET:
+            return self.bg_video_cap2, self.bg_frame_interval2, self.bg_video_fps2
+        elif chapter == CHAPTER_PALACE:
+            return self.bg_video_cap3, self.bg_frame_interval3, self.bg_video_fps3
+        else:
+            return self.bg_video_cap, self.bg_frame_interval, self.bg_video_fps
+
+    def get_display_level_for_chapter(self, chapter):
+        level = self.chapter_progress.get(chapter, 1)
+        if level < 1:
+            level = 1
+        if level > MAX_LEVEL_PER_CHAPTER:
+            level = MAX_LEVEL_PER_CHAPTER
+        return level
+
+    def sync_current_level_with_chapter(self):
+        self.current_level = self.get_display_level_for_chapter(self.current_chapter)
+
+    def mark_finished_flags(self):
+        self.life_jianghu_finished = self.chapter_progress[CHAPTER_LIFE_JIANGHU] > MAX_LEVEL_PER_CHAPTER
+        self.street_finished = self.chapter_progress[CHAPTER_STREET] > MAX_LEVEL_PER_CHAPTER
+        self.palace_finished = self.chapter_progress[CHAPTER_PALACE] > MAX_LEVEL_PER_CHAPTER
+
+    def update_board_params(self):
+        if self.current_chapter == CHAPTER_LIFE_JIANGHU and self.current_level == 10 and self.is_story_mode():
+            self.board_rows = SPECIAL_LEVEL1_10_ROWS
+        else:
+            self.board_rows = DEFAULT_BOARD_ROWS
+
+        self.BOARD_SCALE = 0.8
+        self.CELL_SIZE = int(BASE_CELL_SIZE * self.BOARD_SCALE)
+        self.BOX_SIZE = self.CELL_SIZE
+
+        base_chess_size = self.CELL_SIZE // 3 * 2
+        if self.current_chapter == CHAPTER_LIFE_JIANGHU:
+            self.CHESS_SIZE = int(base_chess_size * 0.9)
+        else:
+            self.CHESS_SIZE = int(base_chess_size * 0.6)
+
+        board_width = BOARD_COLS * self.CELL_SIZE
+        board_height = self.board_rows * self.CELL_SIZE
+
+        self.BOARD_OFFSET_X = (SCREEN_WIDTH - board_width) // 2
+        self.BOARD_OFFSET_Y = (SCREEN_HEIGHT - board_height) // 2
+
+    def init_debug_progress(self):
+        if DEBUG_INIT_PROGRESS == 0:
+            self.chapter_progress = {
+                CHAPTER_LIFE_JIANGHU: 1,
+                CHAPTER_STREET: 1,
+                CHAPTER_PALACE: 1
+            }
+            self.current_chapter = CHAPTER_LIFE_JIANGHU
+            self.current_level = 1
+            self.mark_finished_flags()
+            return
+
+        progress = DEBUG_INIT_PROGRESS
+
+        self.chapter_progress = {
+            CHAPTER_LIFE_JIANGHU: 1,
+            CHAPTER_STREET: 1,
+            CHAPTER_PALACE: 1
+        }
+
+        if progress <= 10:
+            self.current_chapter = CHAPTER_LIFE_JIANGHU
+            self.chapter_progress[CHAPTER_LIFE_JIANGHU] = progress
+            self.chapter_progress[CHAPTER_STREET] = 1
+            self.chapter_progress[CHAPTER_PALACE] = 1
+        elif progress <= 20:
+            self.current_chapter = CHAPTER_STREET
+            self.chapter_progress[CHAPTER_LIFE_JIANGHU] = 11
+            self.chapter_progress[CHAPTER_STREET] = progress - 10
+            self.chapter_progress[CHAPTER_PALACE] = 1
+        else:
+            self.current_chapter = CHAPTER_PALACE
+            self.chapter_progress[CHAPTER_LIFE_JIANGHU] = 11
+            self.chapter_progress[CHAPTER_STREET] = 11
+            self.chapter_progress[CHAPTER_PALACE] = progress - 20
+
+        if progress >= 30:
+            self.chapter_progress[CHAPTER_PALACE] = 11
+
+        self.mark_finished_flags()
+        self.sync_current_level_with_chapter()
+
+    # ====================== 特殊关卡工具 ======================
+
+    def is_tutorial_level(self):
+        return self.is_story_mode() and self.current_chapter == CHAPTER_LIFE_JIANGHU and self.current_level == 1
+
+    def is_forced_guard_level(self):
+        return self.is_story_mode() and self.current_chapter == CHAPTER_LIFE_JIANGHU and self.current_level == 2
+
+    def use_smart_ai(self):
+        if self.mode == MODE_LINGJING:
+            return True
+        return self.current_chapter in [CHAPTER_STREET, CHAPTER_PALACE]
+
+    # ====================== 剧情 ======================
+
+    def init_chapter_stories(self):
+        life_jianghu_stories = {
+            1: [
+                {"text": "天下大势，分久必合，合久必分……", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "东方的火焰在熊熊燃烧，灾祸在山的对岸逐渐酝酿，江湖再次开始涌动……", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "爱欲之人，手如执炬，若逆风而行，必有烧手之患。", "role": "师父", "img_path": SHIFU_IMG_PATH},
+                {"text": "徒儿且来，在你下山之前，为师最后教你这盘棋。", "role": "师父", "img_path": SHIFU_IMG_PATH},
+                {"text": "此番我为守御，在二字棋中，守御者先下一道，构建守御围墙。", "role": "师父", "img_path": SHIFU_IMG_PATH},
+                {"text": "你为攻伐，随后你可在围墙中部署两道攻势。", "role": "师父", "img_path": SHIFU_IMG_PATH},
+                {"text": "守御在部署围墙时，随后的围墙至少要有四分之一的边长与已有的围墙结合。", "role": "师父", "img_path": SHIFU_IMG_PATH},
+                {"text": "二字棋一共五轮，在五轮结束之前，若攻伐者能构筑五星连珠的攻势，则攻伐者胜，反之守御者胜。", "role": "师父", "img_path": SHIFU_IMG_PATH}
+            ],
+            2: [
+                {"text": "（如今天下大乱，战火纷飞，只是我自幼山中学艺，尚且不知王都该往何处去。）", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "那位少侠，老夫看你神色匆匆，可是要下山去？", "role": "渔夫", "img_path": YUFU_IMG_PATH},
+                {"text": "正是！", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "少侠有所不知，如今民生凋敝，有一伙贼人打起了劫道的主意，如今山下江畔便被贼人所占，你还是别去为好！", "role": "渔夫", "img_path": YUFU_IMG_PATH},
+                {"text": "多谢老人家提醒，不过我此番下山，身怀本领，便是为解决这天下乱世而来，若是几个山贼想要拦我的去路，他们大可一试。", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "丛林里传来动静，几个山贼骂骂咧咧地钻了出来。", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "老家伙，又是一月了，近日来渔获不少吧，让我们来搜一搜！", "role": "山贼", "img_path": SHANZEI_IMG_PATH},
+                {"text": "贼子尔敢！", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "（守御之法，可困天锁地，便让我用这守御之法护住老人家。）", "role": "主角", "img_path": ZHUJUE_IMG_PATH}
+            ],
+            3: [
+                {"text": "少侠好身手！此番你救了老朽一命，实在不知何以偿还呀！", "role": "渔夫", "img_path": YUFU_IMG_PATH},
+                {"text": "大可不必，行侠仗义乃我辈本分。", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "我本是江畔一渔夫，只是天下大乱，我不得不舍弃赖以为生的手艺逃难往山上来，既然少侠你想要下山去，便让我为你引路吧。", "role": "渔夫", "img_path": YUFU_IMG_PATH},
+                {"text": "辛苦老人家了！", "role": "主角", "img_path": ZHUJUE_IMG_PATH}
+            ],
+            4: [
+                {"text": "至今还不知道老人家姓甚名谁？", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "老朽老伴已逝，膝下皆死，我自己的名字也是早已忘掉，少侠喊我一声渔叟便可。", "role": "渔夫", "img_path": YUFU_IMG_PATH}
+            ],
+            5: [
+                {"text": "传闻此座山脉中居有一位棋道仙人，若是能拜入其门下，能学到改天换地的法门。", "role": "渔夫", "img_path": YUFU_IMG_PATH}
+            ],
+            6: [
+                {"text": "老人家身子骨真是硬朗，至今已在山脉奔波数日有余，您还是精神抖擞！", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "路途崎岖不足为道，只是如孔夫子言：苛政猛于虎呀！", "role": "渔夫", "img_path": YUFU_IMG_PATH}
+            ],
+            7: [
+                {"text": "我早已过花甲之年，只是不知在如今乱世，这般长寿是福是祸？", "role": "渔夫", "img_path": YUFU_IMG_PATH}
+            ],
+            8: [
+                {"text": "听闻当今圣上穷兵黩武，致使饿殍千里，又听闻叛军四起，当真是大乱之世啊！", "role": "渔夫", "img_path": YUFU_IMG_PATH}
+            ],
+            9: [
+                {"text": "少侠，前方便是渡桥所在，过了那渡桥便可直达王都，只是现在几个山贼在那桥头收过路费，你千万小心！", "role": "渔夫", "img_path": YUFU_IMG_PATH},
+                {"text": "不足为惧，我先去也！", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "哪来的小毛头，拿下他！", "role": "山贼", "img_path": SHANZEI_IMG_PATH}
+            ],
+            10: [
+                {"text": "走出山脉，被一条江河阻拦，对岸就是王都所在的城池。", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "曾经这里有一道木桥，只是随着战乱被摧毁了，只剩一些木材还留在江边。", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "现在你需要利用守御的力量搭建起桥梁，在五步之内搭建到对岸。", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "注意，当任一守御被注入三道攻势后，该守御将会破碎。", "role": "旁白", "img_path": NO_ROLE_IMG}
+            ]
+        }
+
+        street_stories = {
+            1: [
+                {"text": "叛军已经杀到了王都，城内一片肃杀。", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "（拉住了急匆匆逃窜的小贩）", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "这位小哥，不知你现在往哪去？", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "欸你这怪人，快松开我，谁不知道叛军马上要把王都给打下来了，我得赶快收拾东西逃出城外啊！", "role": "行商", "img_path": XINGSHANG_IMG_PATH},
+                {"text": "我才从山上下来，入城之时可是见到重兵把守，一只苍蝇都进不来，你可确定你出得去？", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "我自有我的方法……", "role": "行商", "img_path": XINGSHANG_IMG_PATH},
+                {"text": "不对，那你是怎么进的城！", "role": "行商", "img_path": XINGSHANG_IMG_PATH},
+                {"text": "小哥不必慌张，我自然也有我的方法。", "role": "主角", "img_path": ZHUJUE_IMG_PATH}
+            ],
+            2: [
+                {"text": "我真是见识到少侠的本领了！", "role": "行商", "img_path": XINGSHANG_IMG_PATH},
+                {"text": "我是一名行商，乱世虽危险，不过也是我发财的机会，只是现在王都要被打下来了，我才赶忙要取回我在王都的家产。", "role": "行商", "img_path": XINGSHANG_IMG_PATH},
+                {"text": "我已经跟城门的守将打点了关系，此番出城后我准备去山上避祸一段时间。", "role": "行商", "img_path": XINGSHANG_IMG_PATH},
+                {"text": "那你的计划可能行不通了。", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "啊？", "role": "行商", "img_path": XINGSHANG_IMG_PATH},
+                {"text": "乌云笼罩着王城，厮杀的声音从远方传来。", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "城门已经血流成河了！", "role": "主角", "img_path": ZHUJUE_IMG_PATH}
+            ],
+            3: [
+                {"text": "那这、那这可如何是好！", "role": "行商", "img_path": XINGSHANG_IMG_PATH},
+                {"text": "如今叛军已经杀到家门口，皇帝倒还稳坐宫廷，真是奇怪，小哥，你可方便带我去那皇庭所在？", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "身怀绝技，此去皇庭……", "role": "行商", "img_path": XINGSHANG_IMG_PATH}
+            ],
+            4: [
+                {"text": "两人在街巷上匆忙赶路", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "小哥，说来我尚且不知此番纷争起因，十年之前还听闻天下太平，怎么天下如今如此纷乱？", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "我看少侠年纪轻轻，又多年在山中学艺，想必不知这王朝的历史。", "role": "行商", "img_path": XINGSHANG_IMG_PATH},
+                {"text": "旧都在北方，百年之前却被蛮夷所占，王朝不敌蛮夷，被迫迁都至南方。", "role": "行商", "img_path": XINGSHANG_IMG_PATH},
+                {"text": "到了当今圣上，一心想要夺回北地，不管不顾地招兵买马，才使得现在民不聊生呀！", "role": "行商", "img_path": XINGSHANG_IMG_PATH}
+            ],
+            5: [
+                {"text": "这些年走南闯北，我也见过不少奇珍异宝，听闻圣上手中有一奇特的神石，正是这神石让他有信心收回北地。", "role": "行商", "img_path": XINGSHANG_IMG_PATH}
+            ],
+            6: [
+                {"text": "夺回北地洗刷国耻，这本是好事，只是皇帝操之过急！", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "哎——少侠慎言！", "role": "行商", "img_path": XINGSHANG_IMG_PATH}
+            ],
+            7: [
+                {"text": "圣上之举为收回北地，叛军之举为反抗苛政，只是我等小民夹在中间，守御无本事，攻伐无心气！", "role": "行商", "img_path": XINGSHANG_IMG_PATH}
+            ],
+            8: [
+                {"text": "城门沦陷了，叛军向皇宫奔去。", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "听到马蹄声了吗，叛军追上来了！", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "来这边，躲起来！", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "两人躲进一座佛塔内。", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "躲到哪又有什么用呢？只要还在这王都内，迟早要被抓出来扒个干净！", "role": "行商", "img_path": XINGSHANG_IMG_PATH},
+                {"text": "嘘！有人来了！", "role": "主角", "img_path": ZHUJUE_IMG_PATH}
+            ],
+            9: [
+                {"text": "少侠，我看你是有胸怀大志之人，与我等凡夫俗子不一样，你快去吧，我留在这里便行。", "role": "行商", "img_path": XINGSHANG_IMG_PATH},
+                {"text": "小哥，你就在此处躲好，马上就会好起来的。", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "已经很多人和我安慰过这样的话了，可是这个马上，又要等到多久呢？", "role": "行商", "img_path": XINGSHANG_IMG_PATH},
+                {"text": "（踏出门槛，阴雨夹着血的味道滴在斗笠上）", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "今晚。", "role": "主角", "img_path": ZHUJUE_IMG_PATH}
+            ],
+            10: [
+                {"text": "通往宫殿的路被层层封锁，你必须使用猛烈的攻伐突破重围。", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "当任一守御内被注满攻势时，你可以额外获得一次攻势。", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "敌方的反应很快，你必须在第五道守御出现之前取得胜利。", "role": "旁白", "img_path": NO_ROLE_IMG}
+            ]
+        }
+
+        palace_stories = {
+            1: [
+                {"text": "叛军杀入城内，家家户户躲在家门中，但是门被一一踹开，士兵冲进去大肆搜刮，房屋内传出妇孺的哭喊。", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "住手！", "role": "主角", "img_path": ZHUJUE_IMG_PATH}
+            ],
+            2: [
+                {"text": "乱世源头就在皇庭内，我得速速赶过去！", "role": "主角", "img_path": ZHUJUE_IMG_PATH},
+                {"text": "有人强闯，拦下他！", "role": "士兵", "img_path": SHIBING_IMG_PATH}
+            ],
+            3: [
+                {"text": "报——参见将军，有一奇人异士用一古怪棋阵冲进了皇庭内！", "role": "士兵", "img_path": SHIBING_IMG_PATH},
+                {"text": "皇帝小儿就在宫殿中，马上就要抓住他了，那是重中之重。", "role": "叛军首领", "img_path": PANJUNSHOULING_IMG_PATH},
+                {"text": "传我命令，让左偏将携一营士兵去后方围剿那奇人异士！", "role": "叛军首领", "img_path": PANJUNSHOULING_IMG_PATH}
+            ],
+            4: [
+                {"text": "此时此刻，宫廷内群臣作鸟兽散，只有皇帝还坐在龙椅之上，手中持着一个闪烁着神秘荧光的立方体。", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "只差一筹啊，便可收复北地，名留青史！", "role": "皇帝", "img_path": TIANZI_IMG_PATH}
+            ],
+            5: [
+                {"text": "叛军的阵线被撕开了一个口子。", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "这人的手段好生神奇，我们根本拦不住他！", "role": "士兵", "img_path": SHIBING_IMG_PATH},
+                {"text": "（我本欲推翻昏君，可一路走来，似乎另有隐情，我得赶快去跟皇帝问个清楚！）", "role": "主角", "img_path": ZHUJUE_IMG_PATH}
+            ],
+            6: [
+                {"text": "临兵斗者皆阵列前行，给我破！", "role": "主角", "img_path": ZHUJUE_IMG_PATH}
+            ],
+            7: [
+                {"text": "攻伐之法可助我撕开敌阵，守御之法可助我拦住后方的追击。", "role": "主角", "img_path": ZHUJUE_IMG_PATH}
+            ],
+            8: [
+                {"text": "每拖一分钟，便有数百人死于非命，我必须快一点！", "role": "主角", "img_path": ZHUJUE_IMG_PATH}
+            ],
+            9: [
+                {"text": "叛军首领闯进了宫殿，年轻的皇帝还坐在龙椅之上，居高临下地看着叛军们。", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "你这反贼，你知不知你犯了多大的罪！", "role": "皇帝", "img_path": TIANZI_IMG_PATH},
+                {"text": "罪？等我坐上这把椅子，自有人替我洗罪！", "role": "叛军首领", "img_path": PANJUNSHOULING_IMG_PATH},
+                {"text": "执迷不悟！补天石内天气将满，若是天下人肯再等我一年，则北地可收，万国来朝！", "role": "皇帝", "img_path": TIANZI_IMG_PATH},
+                {"text": "你倒是不在乎天下血流成河，遗言还是留到地府里说去吧！", "role": "叛军首领", "img_path": PANJUNSHOULING_IMG_PATH},
+                {"text": "你真以为你赢定了？补天石内的天气虽不足以驱逐蛮夷，但要杀你一个反贼还是绰绰有余！", "role": "皇帝", "img_path": TIANZI_IMG_PATH},
+                {"text": "说罢，立方体向叛军首领射去一道致命的光束，刹那间，一道突然升起的围墙挡住了光束。", "role": "旁白", "img_path": NO_ROLE_IMG},
+                {"text": "（从天而降，面颊染血）", "role": "受伤主角", "img_path": SHOUSHANG_ZHUJUE_IMG_PATH},
+                {"text": "你们的恩仇现在作废，现在的一切由我来决定！", "role": "受伤主角", "img_path": SHOUSHANG_ZHUJUE_IMG_PATH}
+            ],
+            10: [
+                {"text": "无", "role": "旁白", "img_path": NO_ROLE_IMG}
+            ]
+        }
+
+        return {
+            CHAPTER_LIFE_JIANGHU: life_jianghu_stories,
+            CHAPTER_STREET: street_stories,
+            CHAPTER_PALACE: palace_stories
+        }
+
+    def init_post_win_stories(self):
+        return {
+            (CHAPTER_LIFE_JIANGHU, 1): [
+                {
+                    "text": "此番天下大乱，如今你已习得守御攻伐之法，应当下山去了。至于未来如何则全靠你的造化，若你以守御胜之，则天地将赐予你一缕地气，若你以攻伐胜之，则将赐予你一缕天气。",
+                    "role": "师父",
+                    "img_path": SHIFU_IMG_PATH
+                },
+                {
+                    "text": "前路任重而道远，莫向外求，但从心觅，切记！切记！",
+                    "role": "师父",
+                    "img_path": SHIFU_IMG_PATH
+                },
+                {
+                    "text": "弟子谨记！",
+                    "role": "主角",
+                    "img_path": ZHUJUE_IMG_PATH
+                }
+            ],
+            (CHAPTER_LIFE_JIANGHU, 9): [
+                {
+                    "text": "感谢少侠为民除害！",
+                    "role": "渔夫",
+                    "img_path": YUFU_IMG_PATH
+                },
+                {
+                    "text": "对岸已没什么老朽的牵挂，此后我便在这安居，此处远离纷争，倒也可厮混余生。",
+                    "role": "渔夫",
+                    "img_path": YUFU_IMG_PATH
+                },
+                {
+                    "text": "多谢老先生这些日子来的指引。",
+                    "role": "主角",
+                    "img_path": ZHUJUE_IMG_PATH
+                },
+                {
+                    "text": "来日再见！",
+                    "role": "主角",
+                    "img_path": ZHUJUE_IMG_PATH
+                },
+                {
+                    "text": "来日再见！",
+                    "role": "渔夫",
+                    "img_path": YUFU_IMG_PATH
+                },
+                {
+                    "text": "（若是我孙子没有身死，或许也如少侠一般大了吧！哎……）",
+                    "role": "渔夫",
+                    "img_path": YUFU_IMG_PATH
+                }
+            ]
+        }
+
+    # ====================== 加载资源 ======================
+
+    def load_chess_animation_frames(self):
+        frames = []
+
+        if self.current_chapter == CHAPTER_STREET:
+            chess_anim_dir = CHESS_ANIM_DIR2
+        elif self.current_chapter == CHAPTER_PALACE:
+            chess_anim_dir = CHESS_ANIM_DIR3
+        else:
+            chess_anim_dir = CHESS_ANIM_DIR
+
+        for i in range(1, CHESS_ANIM_FRAMES + 1):
+            p_jpg = os.path.join(chess_anim_dir, f"{i}.jpg")
+            p_png = os.path.join(chess_anim_dir, f"{i}.png")
+
+            if os.path.exists(p_jpg):
+                img = pygame.image.load(p_jpg).convert()
+            elif os.path.exists(p_png):
+                img = pygame.image.load(p_png).convert_alpha()
+            else:
+                continue
+
+            chess_scale = 0.9 if self.current_chapter == CHAPTER_LIFE_JIANGHU else 0.6
+            frame_size = int(self.CELL_SIZE * chess_scale)
+            img = pygame.transform.smoothscale(img, (frame_size, frame_size))
+            frames.append(img)
+
+        return frames
+
+    def load_box_animation_frames(self):
+        frames = []
+        for i in range(1, BOX_TOTAL_FRAMES + 1):
+            p_jpg = os.path.join(BOX_FRAMES_DIR, f"{i}.jpg")
+            p_png = os.path.join(BOX_FRAMES_DIR, f"{i}.png")
+
+            if os.path.exists(p_jpg):
+                img = pygame.image.load(p_jpg).convert_alpha()
+            elif os.path.exists(p_png):
+                img = pygame.image.load(p_png).convert_alpha()
+            else:
+                continue
+
+            img = pygame.transform.smoothscale(img, (self.BOX_SIZE * 2, self.BOX_SIZE * 2))
+            frames.append(img)
+        return frames
+
+    def load_role_images(self):
+        d = {}
+        role_paths = [
+            SHIFU_IMG_PATH, ZHUJUE_IMG_PATH, YUFU_IMG_PATH, SHANZEI_IMG_PATH,
+            XINGSHANG_IMG_PATH, SHOUSHANG_ZHUJUE_IMG_PATH, TIANZI_IMG_PATH,
+            SHIBING_IMG_PATH, PANJUNSHOULING_IMG_PATH
+        ]
+        for p in role_paths:
+            if os.path.exists(p):
+                d[p] = pygame.image.load(p).convert_alpha()
+        return d
+
+    def load_training_icons(self):
+        def load_scaled(path):
+            if os.path.exists(path):
+                img = pygame.image.load(path).convert_alpha()
+                return pygame.transform.smoothscale(img, (self.icon_size, self.icon_size))
+            return None
+
+        return {
+            "lingjing": load_scaled(LINGJING_IMG_PATH),
+            "mingxiang": load_scaled(MINGXIANG_IMG_PATH),
+            "tianding": load_scaled(TIANDING_IMG_PATH)
+        }
+
+    # ====================== 绘制 ======================
+
+    def update_button_positions(self):
+        self.map_btn_rect.x = (SCREEN_WIDTH - BUTTON_WIDTH) // 2
+        self.map_btn_rect.y = SCREEN_HEIGHT // 2 + 40
+
+        total_w = BUTTON_WIDTH * 2 + 20
+        start_x = (SCREEN_WIDTH - total_w) // 2
+        y = SCREEN_HEIGHT // 2 + 35
+
+        self.rematch_btn_rect = pygame.Rect(start_x, y, BUTTON_WIDTH, BUTTON_HEIGHT)
+        self.back_map_btn_rect = pygame.Rect(start_x + BUTTON_WIDTH + 20, y, BUTTON_WIDTH, BUTTON_HEIGHT)
+
+        self.mingxiang_ok_rect = pygame.Rect((SCREEN_WIDTH - 100) // 2, SCREEN_HEIGHT // 2 + 55, 100, 40)
+
+    def draw_plain_background(self):
+        self.screen.fill(self.get_training_bg_color())
+
+    def draw_background_video(self, alpha=255):
+        if self.using_plain_training_theme():
+            self.draw_plain_background()
+            return
+
+        current_time = time.time()
+        chapter_for_bg = self.transition_target_chapter if self.state == STATE_MAP_TRANSITION else self.current_chapter
+        current_cap, frame_interval, _ = self.get_current_bg_config(chapter_for_bg)
+
+        if current_time - self.last_bg_frame_time >= frame_interval:
+            ret, frame = current_cap.read()
+            if not ret:
+                current_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = current_cap.read()
+
+            if ret:
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frame_rgb = cv2.resize(frame_rgb, (SCREEN_WIDTH, SCREEN_HEIGHT))
+                self.bg_surf = pygame.surfarray.make_surface(frame_rgb.transpose(1, 0, 2))
+
+            self.last_bg_frame_time = current_time
+
+        if self.bg_surf is not None:
+            if alpha < 255:
+                self.bg_surf.set_alpha(alpha)
+            else:
+                self.bg_surf.set_alpha(None)
+            self.screen.blit(self.bg_surf, (0, 0))
+
+    def update_animation(self):
+        self.screen.fill(WHITE)
+
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if e.type == pygame.MOUSEBUTTONDOWN:
+                self.animation_skip = True
+
+        if self.animation_skip:
+            self.state = STATE_STORY
+            return
+
+        ret, f = self.animation_cap.read()
+        if not ret:
+            self.state = STATE_STORY
+            return
+
+        f = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
+        f = cv2.resize(f, (SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.screen.blit(pygame.surfarray.make_surface(f.transpose(1, 0, 2)), (0, 0))
+
+        a = int(100 + 155 * (math.sin(pygame.time.get_ticks() * 0.0015) + 1) / 2)
+        skip = self.font.render(SKIP_TEXT, True, BLACK)
+        skip.set_alpha(a)
+        self.screen.blit(skip, skip.get_rect(centerx=SCREEN_WIDTH // 2, bottom=SCREEN_HEIGHT - 20))
+
+        self.clock.tick(self.animation_fps)
+        pygame.display.flip()
+
+    def switch_music_scene(self, target):
+        if self.current_music_scene == target:
+            return
+
+        self.animation_channel.stop()
+        self.game_channel.stop()
+        self.map_channel.stop()
+        self.extra_channel.stop()
+
+        if target == MUSIC_SCENE_ANIMATION:
+            self.animation_channel.play(self.animation_bgm, loops=0)
+            self.animation_channel.set_volume(0.5)
+        elif target == MUSIC_SCENE_GAME:
+            if self.current_chapter == CHAPTER_STREET:
+                self.game_channel.play(self.game_bgm2, loops=-1)
+            elif self.current_chapter == CHAPTER_PALACE:
+                self.game_channel.play(self.game_bgm3, loops=-1)
+            else:
+                self.game_channel.play(self.game_bgm, loops=-1)
+            self.game_channel.set_volume(MIN_VOLUME)
+        elif target == MUSIC_SCENE_MAP:
+            self.map_channel.play(self.map_bgm, loops=-1)
+            self.map_channel.set_volume(MIN_VOLUME)
+        elif target == MUSIC_SCENE_NONE:
+            pass
+
+        self.current_music_scene = target
+
+    def wrap_text(self, t, font, w):
+        lines = []
+        cur = ""
+        for c in t:
+            if font.size(cur + c)[0] <= w:
+                cur += c
+            else:
+                lines.append(cur)
+                cur = c
+        if cur:
+            lines.append(cur)
+        return lines
+
+    def _draw_dialogue_from_list(self, dialogue_list, idx, draw_bg=True):
+        if draw_bg:
+            self.draw_background_video()
+
+        if idx >= len(dialogue_list):
+            return False
+
+        d = dialogue_list[idx]
+        t = d["text"]
+        img = d["img_path"]
+
+        h = SCREEN_HEIGHT // 5
+        y = SCREEN_HEIGHT - h
+
+        s = pygame.Surface((SCREEN_WIDTH, h), pygame.SRCALPHA)
+        s.fill(BLACK_BG)
+        self.screen.blit(s, (0, y))
+
+        if img and img in self.role_images:
+            i = self.role_images[img]
+            scale = min(300 / i.get_width(), 450 / i.get_height())
+            i = pygame.transform.smoothscale(i, (int(i.get_width() * scale), int(i.get_height() * scale)))
+
+            if img in [
+                SHIFU_IMG_PATH, YUFU_IMG_PATH, SHANZEI_IMG_PATH, XINGSHANG_IMG_PATH,
+                SHIBING_IMG_PATH, PANJUNSHOULING_IMG_PATH, TIANZI_IMG_PATH
+            ]:
+                self.screen.blit(i, (0, y - i.get_height()))
+            elif img in [ZHUJUE_IMG_PATH, SHOUSHANG_ZHUJUE_IMG_PATH]:
+                self.screen.blit(i, (SCREEN_WIDTH - i.get_width(), y - i.get_height()))
+
+        lines = self.wrap_text(t, self.story_font, int(SCREEN_WIDTH * 0.9))
+        lh = self.story_font.get_height()
+        ty = y + (h - lh * len(lines)) // 2
+
+        for l in lines:
+            ts = self.story_font.render(l, True, WHITE)
+            self.screen.blit(ts, ((SCREEN_WIDTH - ts.get_width()) // 2, ty))
+            ty += lh
+
+        tip = self.font.render("点击屏幕继续", True, LIGHT_GRAY)
+        tip.set_alpha(200)
+        self.screen.blit(tip, ((SCREEN_WIDTH - tip.get_width()) // 2, SCREEN_HEIGHT - 30))
+        return True
+
+    def draw_story_dialogue(self):
+        current_chapter_stories = self.chapter_stories.get(self.current_chapter, {})
+        current_story_list = current_chapter_stories.get(
+            self.current_level,
+            [{"text": "无剧情", "role": "旁白", "img_path": NO_ROLE_IMG}]
+        )
+
+        if self.current_story_idx >= len(current_story_list):
+            if self.is_tutorial_level():
+                self.current_role = "攻伐"
+                self.ai_role = "守御"
+                self.state = STATE_PLACE_CHESS
+            elif self.is_forced_guard_level():
+                self.current_role = "守御"
+                self.ai_role = "攻伐"
+                self.state = STATE_PLACE_BOX
+            else:
+                self.state = STATE_CHOOSE_ROLE
+            return
+
+        if self.is_tutorial_level():
+            self.draw_background_video()
+            self.draw_grid()
+            self.draw_boxes()
+            self.draw_chess()
+
+            if self.current_story_idx == 5:
+                tip = self.font.render("请在守御内注入两道攻势", True, WHITE)
+                tip_bg = pygame.Surface((SCREEN_WIDTH, 34), pygame.SRCALPHA)
+                tip_bg.fill((0, 0, 0, 150))
+                self.screen.blit(tip_bg, (0, 20))
+                self.screen.blit(tip, tip.get_rect(center=(SCREEN_WIDTH // 2, 37)))
+                self.draw_ghost()
+
+            self._draw_dialogue_from_list(current_story_list, self.current_story_idx, draw_bg=False)
+        else:
+            self._draw_dialogue_from_list(current_story_list, self.current_story_idx, draw_bg=True)
+
+    def draw_post_win_dialogue(self):
+        if self.current_post_win_story_idx >= len(self.current_post_win_story):
+            self.state = STATE_GAME_OVER
+            return
+        self._draw_dialogue_from_list(self.current_post_win_story, self.current_post_win_story_idx, draw_bg=True)
+
+    def draw_role_choose_window(self):
+        self.draw_background_video()
+
+        mask = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        mask.fill((0, 0, 0, 150))
+        self.screen.blit(mask, (0, 0))
+
+        ww, wh = 320, 200
+        wx = (SCREEN_WIDTH - ww) // 2
+        wy = (SCREEN_HEIGHT - wh) // 2
+
+        ws = pygame.Surface((ww, wh), pygame.SRCALPHA)
+        ws.fill(INK_BG)
+        pygame.draw.rect(ws, INK_BLACK, (0, 0, ww, wh), 3)
+        self.screen.blit(ws, (wx, wy))
+
+        title = self.choose_font.render("本局你选择：", True, INK_BLACK)
+        self.screen.blit(title, (wx + (ww - title.get_width()) // 2, wy + 50))
+
+        mx, my = pygame.mouse.get_pos()
+
+        c1 = LIGHT_GRAY if not self.gongfa_btn_rect.collidepoint(mx, my) else (200, 200, 200)
+        pygame.draw.rect(self.screen, c1, self.gongfa_btn_rect)
+        pygame.draw.rect(self.screen, INK_BLACK, self.gongfa_btn_rect, 2)
+        t1 = self.choose_font.render("攻伐", True, INK_BLACK)
+        self.screen.blit(
+            t1,
+            (self.gongfa_btn_rect.centerx - t1.get_width() // 2,
+             self.gongfa_btn_rect.centery - t1.get_height() // 2)
+        )
+
+        c2 = LIGHT_GRAY if not self.shouyu_btn_rect.collidepoint(mx, my) else (200, 200, 200)
+        pygame.draw.rect(self.screen, c2, self.shouyu_btn_rect)
+        pygame.draw.rect(self.screen, INK_BLACK, self.shouyu_btn_rect, 2)
+        t2 = self.choose_font.render("守御", True, INK_BLACK)
+        self.screen.blit(
+            t2,
+            (self.shouyu_btn_rect.centerx - t2.get_width() // 2,
+             self.shouyu_btn_rect.centery - t2.get_height() // 2)
+        )
+
+    def draw_mingxiang_info_window(self):
+        self.draw_plain_background()
+
+        mask = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        mask.fill((0, 0, 0, 80))
+        self.screen.blit(mask, (0, 0))
+
+        ww, wh = 340, 190
+        wx = (SCREEN_WIDTH - ww) // 2
+        wy = (SCREEN_HEIGHT - wh) // 2
+
+        panel = pygame.Surface((ww, wh), pygame.SRCALPHA)
+        panel.fill((255, 252, 235, 245))
+        pygame.draw.rect(panel, INK_BLACK, (0, 0, ww, wh), 3)
+        self.screen.blit(panel, (wx, wy))
+
+        lines = [
+            "在冥想中，你既是攻伐又是守御",
+        ]
+        y = wy + 45
+        for line in lines:
+            ts = self.story_font.render(line, True, INK_BLACK)
+            self.screen.blit(ts, ts.get_rect(center=(SCREEN_WIDTH // 2, y)))
+            y += 35
+
+        mx, my = pygame.mouse.get_pos()
+        c = LIGHT_GRAY if not self.mingxiang_ok_rect.collidepoint(mx, my) else DARK_GRAY
+        pygame.draw.rect(self.screen, c, self.mingxiang_ok_rect)
+        pygame.draw.rect(self.screen, INK_BLACK, self.mingxiang_ok_rect, 2)
+        t = self.font.render("知晓", True, INK_BLACK)
+        self.screen.blit(t, t.get_rect(center=self.mingxiang_ok_rect.center))
+
+    def draw_map_training_icons(self):
+        items = [
+            (self.lingjing_rect, self.training_icons["lingjing"], "灵境"),
+            (self.mingxiang_rect, self.training_icons["mingxiang"], "冥想"),
+            (self.tianding_rect, self.training_icons["tianding"], "天顶"),
+        ]
+
+        mx, my = pygame.mouse.get_pos()
+
+        for rect, img, label in items:
+            hover = rect.collidepoint(mx, my)
+            bg = pygame.Surface((rect.width + 56, rect.height), pygame.SRCALPHA)
+            bg.fill((255, 255, 255, 70 if hover else 40))
+            self.screen.blit(bg, (rect.x - 2, rect.y))
+
+            if img:
+                self.screen.blit(img, rect.topleft)
+            else:
+                pygame.draw.rect(self.screen, WHITE, rect)
+                pygame.draw.rect(self.screen, BLACK, rect, 1)
+
+            label_font = self.small_font if not hover else pygame.font.SysFont("KaiTi", 14, bold=True)
+            ts = label_font.render(label, True, DARK_BLUE)
+            self.screen.blit(ts, (rect.right + 6, rect.centery - ts.get_height() // 2))
+
+    def draw_top_notice(self):
+        if time.time() < self.tianding_tip_until and self.tianding_tip_text:
+            w, h = 320, 44
+            rect = pygame.Rect((SCREEN_WIDTH - w) // 2, 25, w, h)
+            s = pygame.Surface((w, h), pygame.SRCALPHA)
+            s.fill((0, 0, 0, 160))
+            self.screen.blit(s, rect.topleft)
+            pygame.draw.rect(self.screen, WHITE, rect, 1)
+            txt = self.font.render(self.tianding_tip_text, True, WHITE)
+            self.screen.blit(txt, txt.get_rect(center=rect.center))
+
+    def update_map(self):
+        mx, my = pygame.mouse.get_pos()
+
+        life_jianghu_area = 0 <= mx <= SCREEN_WIDTH // 2 + 50 and SCREEN_HEIGHT // 2 - 50 <= my <= SCREEN_HEIGHT
+        street_area = 3 * SCREEN_WIDTH // 4 - 50 <= mx <= SCREEN_WIDTH and SCREEN_HEIGHT // 2 - 50 <= my <= SCREEN_HEIGHT
+        palace_area = SCREEN_WIDTH // 2 - 80 <= mx <= SCREEN_WIDTH // 4 * 3 + 70 and 50 <= my <= SCREEN_HEIGHT // 2 + 10
+
+        ret, f = self.map_cap.read()
+        if not ret:
+            self.map_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, f = self.map_cap.read()
+
+        if ret:
+            f = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
+            f = cv2.resize(f, (SCREEN_WIDTH, SCREEN_HEIGHT))
+            s = pygame.surfarray.make_surface(f.transpose(1, 0, 2))
+            self.screen.blit(s, (0, 0))
+
+        if self.life_jianghu_finished:
+            life_jianghu_color = LOCKED_GRAY
+            life_jianghu_font = self.text_font_normal
+        else:
+            life_jianghu_color = DARK_BLUE
+            life_jianghu_font = self.text_font_hover if life_jianghu_area else self.text_font_normal
+
+        t_life = life_jianghu_font.render(TEXT_LIFE_JIANGHU, True, life_jianghu_color)
+        self.screen.blit(t_life, t_life.get_rect(centerx=SCREEN_WIDTH // 4, centery=SCREEN_HEIGHT // 2 + 50))
+
+        if not self.life_jianghu_finished:
+            street_color = LOCKED_GRAY
+            street_font = self.text_font_normal
+        elif self.street_finished:
+            street_color = LOCKED_GRAY
+            street_font = self.text_font_normal
+        else:
+            street_color = DARK_BLUE
+            street_font = self.text_font_hover if street_area else self.text_font_normal
+
+        t_street = street_font.render(TEXT_STREET, True, street_color)
+        self.screen.blit(t_street, t_street.get_rect(centerx=3 * SCREEN_WIDTH // 4 + 20, centery=SCREEN_HEIGHT // 2 + 180))
+
+        if not self.street_finished:
+            palace_color = LOCKED_GRAY
+            palace_font = self.text_font_normal
+        elif self.palace_finished:
+            palace_color = LOCKED_GRAY
+            palace_font = self.text_font_normal
+        else:
+            palace_color = DARK_BLUE
+            palace_font = self.text_font_hover if palace_area else self.text_font_normal
+
+        t_palace = palace_font.render(TEXT_PALACE, True, palace_color)
+        self.screen.blit(t_palace, t_palace.get_rect(centerx=SCREEN_WIDTH // 2 + 120, centery=SCREEN_HEIGHT // 4 + 60))
+
+        # 天气
+        weather_text = self.count_font.render(f"天气 {self.weather_count}", True, DARK_BLUE)
+        weather_bg_w = int((weather_text.get_width() + 20) * 1.5)
+        weather_bg_h = int((weather_text.get_height() + 20) * 1.5)
+        tianqi_img_scaled = pygame.transform.smoothscale(
+            self.tianqi_img, (weather_bg_w, weather_bg_h)
+        )
+        weather_text_x = SCREEN_WIDTH - weather_text.get_width() - 24
+        weather_text_y = SCREEN_HEIGHT - 78
+        weather_bg_x = weather_text_x - (weather_bg_w - weather_text.get_width()) // 2
+        weather_bg_y = weather_text_y - (weather_bg_h - weather_text.get_height()) // 2
+        self.screen.blit(tianqi_img_scaled, (weather_bg_x + 5, weather_bg_y + 3))
+        self.screen.blit(weather_text, (weather_text_x, weather_text_y))
+
+        # 地气
+        qi_text = self.count_font.render(f"地气 {self.qi_count}", True, BROWN)
+        qi_bg_w = int((qi_text.get_width() + 12) * 1.5)
+        qi_bg_h = int((qi_text.get_height() + 12) * 1.5)
+        diqi_img_scaled = pygame.transform.smoothscale(
+            self.diqi_img, (qi_bg_w, qi_bg_h)
+        )
+        qi_text_x = SCREEN_WIDTH - qi_text.get_width() - 24
+        qi_text_y = SCREEN_HEIGHT - 24
+        qi_bg_x = qi_text_x - (qi_bg_w - qi_text.get_width()) // 2
+        qi_bg_y = qi_text_y - (qi_bg_h - qi_text.get_height()) // 2
+        self.screen.blit(diqi_img_scaled, (qi_bg_x + 5, qi_bg_y - 5))
+        self.screen.blit(qi_text, (qi_text_x, qi_text_y))
+
+        self.draw_map_training_icons()
+        self.draw_top_notice()
+
+    def draw_grid(self):
+        for x in range(BOARD_COLS + 1):
+            sx = self.BOARD_OFFSET_X + x * self.CELL_SIZE
+            pygame.draw.aaline(
+                self.screen, GRAY,
+                (sx, self.BOARD_OFFSET_Y),
+                (sx, self.BOARD_OFFSET_Y + self.board_rows * self.CELL_SIZE)
+            )
+
+        for y in range(self.board_rows + 1):
+            sy = self.BOARD_OFFSET_Y + y * self.CELL_SIZE
+            pygame.draw.aaline(
+                self.screen, GRAY,
+                (self.BOARD_OFFSET_X, sy),
+                (self.BOARD_OFFSET_X + BOARD_COLS * self.CELL_SIZE, sy)
+            )
+
+    def draw_boxes(self):
+        if self.using_plain_training_theme():
+            for ax, ay in self.box_anchors:
+                x = self.BOARD_OFFSET_X + ax * self.CELL_SIZE
+                y = self.BOARD_OFFSET_Y + ay * self.CELL_SIZE
+                pygame.draw.rect(
+                    self.screen,
+                    BLACK,
+                    (x, y, self.CELL_SIZE * 2, self.CELL_SIZE * 2),
+                    3
+                )
+            return
+
+        for ax, ay in self.box_anchors:
+            x = self.BOARD_OFFSET_X + ax * self.CELL_SIZE
+            y = self.BOARD_OFFSET_Y + ay * self.CELL_SIZE
+            if self.box_frames:
+                self.screen.blit(self.box_frames[-1], (x, y))
+
+    def draw_chess(self):
+        if self.using_plain_training_theme():
+            for x, y in self.chess:
+                cx = self.BOARD_OFFSET_X + x * self.CELL_SIZE + self.CELL_SIZE // 2
+                cy = self.BOARD_OFFSET_Y + y * self.CELL_SIZE + self.CELL_SIZE // 2
+                pygame.draw.circle(self.screen, WHITE, (cx, cy), max(8, self.CELL_SIZE // 4))
+                pygame.draw.circle(self.screen, BLACK, (cx, cy), max(8, self.CELL_SIZE // 4), 1)
+            return
+
+        for x, y in self.chess:
+            cx = self.BOARD_OFFSET_X + x * self.CELL_SIZE
+            cy = self.BOARD_OFFSET_Y + y * self.CELL_SIZE
+            if self.chess_anim_frames:
+                offset_x = (self.CELL_SIZE - self.chess_anim_frames[-1].get_width()) // 2
+                offset_y = (self.CELL_SIZE - self.chess_anim_frames[-1].get_height()) // 2
+                self.screen.blit(self.chess_anim_frames[-1], (cx + offset_x, cy + offset_y))
+
+    def draw_ghost(self):
+        if not self.ghost_pos:
+            return
+
+        allow = self.is_player_turn() or (self.state == STATE_STORY and self.is_tutorial_level() and self.current_story_idx == 5)
+        if not allow:
+            return
+
+        gx, gy = self.ghost_pos
+
+        if self.state in (STATE_PLACE_BOX, STATE_PLAY_BOX_VIDEO):
+            ok = self.can_place_2x2_box(gx, gy)
+            ax, ay = self.get_box_anchor_from_click(gx, gy)
+
+            if self.using_plain_training_theme():
+                x = self.BOARD_OFFSET_X + ax * self.CELL_SIZE
+                y = self.BOARD_OFFSET_Y + ay * self.CELL_SIZE
+                s = pygame.Surface((self.CELL_SIZE * 2, self.CELL_SIZE * 2), pygame.SRCALPHA)
+                s.fill((0, 0, 0, 20 if ok else 60))
+                self.screen.blit(s, (x, y))
+                pygame.draw.rect(self.screen, BLACK if ok else RED, (x, y, self.CELL_SIZE * 2, self.CELL_SIZE * 2), 2)
+            else:
+                c = BLACK_FADE if ok else ERROR_FADE
+                for x, y in self.get_box_cells_by_anchor(ax, ay):
+                    s = pygame.Surface((self.CELL_SIZE, self.CELL_SIZE), pygame.SRCALPHA)
+                    s.fill(c)
+                    self.screen.blit(
+                        s,
+                        (self.BOARD_OFFSET_X + x * self.CELL_SIZE,
+                         self.BOARD_OFFSET_Y + y * self.CELL_SIZE)
+                    )
+
+        elif self.state in (STATE_PLACE_CHESS, STATE_PLAY_CHESS_VIDEO, STATE_STORY):
+            ok = (gx, gy) in self.box_cells_all and (gx, gy) not in self.chess
+
+            if self.using_plain_training_theme():
+                cx = self.BOARD_OFFSET_X + gx * self.CELL_SIZE + self.CELL_SIZE // 2
+                cy = self.BOARD_OFFSET_Y + gy * self.CELL_SIZE + self.CELL_SIZE // 2
+                temp = pygame.Surface((self.CELL_SIZE, self.CELL_SIZE), pygame.SRCALPHA)
+                col = (255, 255, 255, 120) if ok else (255, 0, 0, 120)
+                pygame.draw.circle(temp, col, (self.CELL_SIZE // 2, self.CELL_SIZE // 2), max(8, self.CELL_SIZE // 4))
+                self.screen.blit(temp, (self.BOARD_OFFSET_X + gx * self.CELL_SIZE, self.BOARD_OFFSET_Y + gy * self.CELL_SIZE))
+                pygame.draw.circle(self.screen, BLACK if ok else RED, (cx, cy), max(8, self.CELL_SIZE // 4), 1)
+            else:
+                c = WHITE_FADE if ok else ERROR_FADE
+                s = pygame.Surface((self.CELL_SIZE, self.CELL_SIZE), pygame.SRCALPHA)
+                circle_radius = int(self.CELL_SIZE * 0.8 / 2)
+                circle_center = (self.CELL_SIZE // 2, self.CELL_SIZE // 2)
+                pygame.draw.circle(s, c, circle_center, circle_radius)
+
+                self.screen.blit(
+                    s,
+                    (self.BOARD_OFFSET_X + gx * self.CELL_SIZE,
+                     self.BOARD_OFFSET_Y + gy * self.CELL_SIZE)
+                )
+
+    def draw_game_over_popup(self):
+        mask = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        mask.fill((0, 0, 0, 140))
+        self.screen.blit(mask, (0, 0))
+
+        w, h = 340, 240
+        r = pygame.Rect((SCREEN_WIDTH - w) // 2, (SCREEN_HEIGHT - h) // 2, w, h)
+        pygame.draw.rect(self.screen, WHITE, r)
+        pygame.draw.rect(self.screen, BLACK, r, 2)
+
+        popup_font_big = pygame.font.SysFont("KaiTi", 30)
+
+        if self.mode == MODE_STORY:
+            popup_font_small = pygame.font.SysFont("KaiTi", 22)
+
+            if self.player_won:
+                title_text = "克敌制胜"
+                reward_text = "天气+1" if self.current_role == "攻伐" else "地气+1"
+                title_surf = popup_font_big.render(title_text, True, BLACK)
+                reward_surf = popup_font_small.render(reward_text, True, BLACK)
+
+                self.screen.blit(title_surf, title_surf.get_rect(center=(SCREEN_WIDTH // 2, r.y + 75)))
+                self.screen.blit(reward_surf, reward_surf.get_rect(center=(SCREEN_WIDTH // 2, r.y + 120)))
+            else:
+                title_text = "铩羽而归"
+                title_surf = popup_font_big.render(title_text, True, BLACK)
+                self.screen.blit(title_surf, title_surf.get_rect(center=(SCREEN_WIDTH // 2, r.y + 95)))
+
+            mx, my = pygame.mouse.get_pos()
+            c = LIGHT_GRAY if not self.map_btn_rect.collidepoint(mx, my) else DARK_GRAY
+            pygame.draw.rect(self.screen, c, self.map_btn_rect)
+            pygame.draw.rect(self.screen, BLACK, self.map_btn_rect, 2)
+
+            bt = self.font.render("返回地图", True, BLACK)
+            self.screen.blit(bt, bt.get_rect(center=self.map_btn_rect.center))
+            return
+
+        if self.mode == MODE_LINGJING:
+            title_text = "克敌制胜" if self.player_won else "铩羽而归"
+        elif self.mode == MODE_MINGXIANG:
+            title_text = "攻伐得势" if self.winner == "棋" else "守御得势"
+        else:
+            title_text = "对局结束"
+
+        title_surf = popup_font_big.render(title_text, True, BLACK)
+        self.screen.blit(title_surf, title_surf.get_rect(center=(SCREEN_WIDTH // 2, r.y + 90)))
+
+        mx, my = pygame.mouse.get_pos()
+
+        c1 = LIGHT_GRAY if not self.rematch_btn_rect.collidepoint(mx, my) else DARK_GRAY
+        pygame.draw.rect(self.screen, c1, self.rematch_btn_rect)
+        pygame.draw.rect(self.screen, BLACK, self.rematch_btn_rect, 2)
+        t1 = self.font.render("再战", True, BLACK)
+        self.screen.blit(t1, t1.get_rect(center=self.rematch_btn_rect.center))
+
+        c2 = LIGHT_GRAY if not self.back_map_btn_rect.collidepoint(mx, my) else DARK_GRAY
+        pygame.draw.rect(self.screen, c2, self.back_map_btn_rect)
+        pygame.draw.rect(self.screen, BLACK, self.back_map_btn_rect, 2)
+        t2 = self.font.render("返回地图", True, BLACK)
+        self.screen.blit(t2, t2.get_rect(center=self.back_map_btn_rect.center))
+
+    # ====================== 教程关工具 ======================
+
+    def is_tutorial_story_active(self):
+        return self.is_tutorial_level() and self.state in [STATE_STORY, STATE_PLAY_BOX_VIDEO, STATE_PLAY_CHESS_VIDEO]
+
+    def get_tutorial_story_action(self):
+        if not self.is_tutorial_level():
+            return None
+
+        if self.current_story_idx == 4:
+            return "ai_box_1"
+        elif self.current_story_idx == 5:
+            return "player_two_chess"
+        elif self.current_story_idx == 6:
+            return "ai_box_2"
+        return None
+
+    def can_advance_tutorial_story(self):
+        action = self.get_tutorial_story_action()
+        if action == "ai_box_1":
+            return self.tutorial_box1_done
+        elif action == "player_two_chess":
+            return self.tutorial_player_chess_done >= 2
+        elif action == "ai_box_2":
+            return self.tutorial_box2_done
+        return True
+
+    def update_tutorial_story_flow(self):
+        if self.state != STATE_STORY or not self.is_tutorial_level():
+            return
+
+        action = self.get_tutorial_story_action()
+
+        if action == "ai_box_1":
+            if not self.tutorial_box1_started and not self.tutorial_box1_done:
+                self.tutorial_box1_started = True
+                self.ai_make_box_move(return_state_after_anim=STATE_STORY, tutorial_mode=True)
+
+        elif action == "ai_box_2":
+            if not self.tutorial_box2_started and not self.tutorial_box2_done:
+                self.tutorial_box2_started = True
+                self.ai_make_box_move(return_state_after_anim=STATE_STORY, tutorial_mode=True)
+
+    # ====================== 棋盘逻辑 ======================
+
+    def get_box_anchor_from_click(self, gx, gy):
+        return (
+            gx if gx < BOARD_COLS - 1 else BOARD_COLS - 2,
+            gy if gy < self.board_rows - 1 else self.board_rows - 2
+        )
+
+    def get_box_cells_by_anchor(self, ax, ay):
+        return {(ax, ay), (ax + 1, ay), (ax, ay + 1), (ax + 1, ay + 1)}
+
+    def calculate_box_edge_overlap(self, cells):
+        c = 0
+        for x, y in cells:
+            if (x + 1, y) in self.box_cells_all:
+                c += 1
+            if (x - 1, y) in self.box_cells_all:
+                c += 1
+            if (x, y + 1) in self.box_cells_all:
+                c += 1
+            if (x, y - 1) in self.box_cells_all:
+                c += 1
+        return c
+
+    def can_place_2x2_box_at_anchor(self, ax, ay):
+        if ax is None or ay is None:
+            return False
+        if not (0 <= ax < BOARD_COLS - 1 and 0 <= ay < self.board_rows - 1):
+            return False
+        if (ax, ay) in self.box_anchors:
+            return False
+
+        cells = self.get_box_cells_by_anchor(ax, ay)
+
+        if cells & self.box_cells_all:
+            return False
+
+        if not self.box_anchors:
+            return True
+
+        return self.calculate_box_edge_overlap(cells) >= 2
+
+    def can_place_2x2_box(self, gx, gy):
+        if gx is None or gy is None:
+            return False
+        ax, ay = self.get_box_anchor_from_click(gx, gy)
+        return self.can_place_2x2_box_at_anchor(ax, ay)
+
+    def direct_add_box_for_training(self, gx, gy):
+        ax, ay = self.get_box_anchor_from_click(gx, gy)
+        self.box_anchors.add((ax, ay))
+        self.box_cells_all.update(self.get_box_cells_by_anchor(ax, ay))
+        self.chess_step = 0
+        self.state = STATE_PLACE_CHESS
+        self.ai_action_started_at = None
+
+    def direct_add_chess_for_training(self, gx, gy):
+        self.chess.append((gx, gy))
+        self.chess_step += 1
+
+        if self.chess_step >= 2:
+            self.rounds += 1
+            self.chess_step = 0
+            self.state = STATE_PLACE_BOX
+        else:
+            self.state = STATE_PLACE_CHESS
+
+        self.ai_action_started_at = None
+        self.check_and_apply_game_over()
+
+    def add_2x2_box(self, gx, gy, return_state_after_anim=None, tutorial_mode=False):
+        if self.using_plain_training_theme():
+            self.direct_add_box_for_training(gx, gy)
+            return
+
+        ax, ay = self.get_box_anchor_from_click(gx, gy)
+        self.waiting_box_pos = (ax, ay)
+        self.box_anim_pos = (
+            self.BOARD_OFFSET_X + ax * self.CELL_SIZE,
+            self.BOARD_OFFSET_Y + ay * self.CELL_SIZE
+        )
+        self.box_anim_start_time = time.time()
+        self.current_box_frame = 0
+
+        self.return_state_after_anim = return_state_after_anim
+        self.animation_tutorial_mode = tutorial_mode
+
+        self.state = STATE_PLAY_BOX_VIDEO
+        self.ai_action_started_at = None
+
+    def add_chess(self, gx, gy, return_state_after_anim=None, tutorial_mode=False):
+        if self.using_plain_training_theme():
+            self.direct_add_chess_for_training(gx, gy)
+            return
+
+        self.waiting_chess_pos = (gx, gy)
+
+        base_x = self.BOARD_OFFSET_X + gx * self.CELL_SIZE
+        base_y = self.BOARD_OFFSET_Y + gy * self.CELL_SIZE
+
+        if self.chess_anim_frames:
+            frame_w = self.chess_anim_frames[0].get_width()
+            frame_h = self.chess_anim_frames[0].get_height()
+        else:
+            frame_w = self.CELL_SIZE
+            frame_h = self.CELL_SIZE
+
+        offset_x = (self.CELL_SIZE - frame_w) // 2
+        offset_y = (self.CELL_SIZE - frame_h) // 2
+        self.chess_anim_pos = (base_x + offset_x, base_y + offset_y)
+
+        self.chess_anim_start_time = time.time()
+        self.current_chess_frame = 0
+
+        self.return_state_after_anim = return_state_after_anim
+        self.animation_tutorial_mode = tutorial_mode
+
+        self.state = STATE_PLAY_CHESS_VIDEO
+        self.ai_action_started_at = None
+
+    def check_win_chess(self):
+        chess_set = set(self.chess)
+        directions = [(1, 0), (0, 1), (1, 1), (1, -1)]
+
+        for x, y in chess_set:
+            for dx, dy in directions:
+                count = 1
+
+                cx, cy = x + dx, y + dy
+                while (cx, cy) in chess_set:
+                    count += 1
+                    cx += dx
+                    cy += dy
+
+                cx, cy = x - dx, y - dy
+                while (cx, cy) in chess_set:
+                    count += 1
+                    cx -= dx
+                    cy -= dy
+
+                if count >= 5:
+                    return True
+
+        return False
+
+    # ====================== 人机逻辑 ======================
+
+    def get_ai_think_delay(self):
+        if self.mode == MODE_LINGJING:
+            return 0.35
+        return 0.5 + 0.25 * (self.rounds - 1)
+
+    def is_ai_turn(self):
+        if self.mode == MODE_MINGXIANG:
+            return False
+        if self.state == STATE_PLACE_BOX:
+            return self.ai_role == "守御"
+        if self.state == STATE_PLACE_CHESS:
+            return self.ai_role == "攻伐"
+        return False
+
+    def is_player_turn(self):
+        if self.mode == MODE_MINGXIANG:
+            return self.state in [STATE_PLACE_BOX, STATE_PLACE_CHESS]
+        if self.state == STATE_PLACE_BOX:
+            return self.current_role == "守御"
+        if self.state == STATE_PLACE_CHESS:
+            return self.current_role == "攻伐"
+        return False
+
+    def finish_battle_no_reward(self, winner, player_won=None):
+        self.winner = winner
+        self.player_won = player_won
+        self.state = STATE_GAME_OVER
+
+    def process_ai_turn(self):
+        if not self.is_ai_turn():
+            self.ai_action_started_at = None
+            return
+
+        if self.ai_action_started_at is None:
+            self.ai_action_started_at = time.time()
+            return
+
+        if time.time() - self.ai_action_started_at < self.get_ai_think_delay():
+            return
+
+        if self.state == STATE_PLACE_BOX:
+            success = self.ai_make_box_move()
+            if not success:
+                if self.mode == MODE_LINGJING:
+                    self.finish_battle_no_reward("棋", self.current_role == "攻伐")
+                else:
+                    self.winner = "棋"
+                    self.player_won = (self.current_role == "攻伐")
+                    if self.player_won:
+                        if self.current_role == "攻伐":
+                            self.weather_count += 1
+                        self.reward_given = True
+                        cleared_chapter = self.current_chapter
+                        cleared_level = self.current_level
+                        self.advance_level_after_clear()
+                        if self.maybe_start_post_win_story(cleared_chapter, cleared_level):
+                            self.ai_action_started_at = None
+                            return
+                    self.state = STATE_GAME_OVER
+
+        elif self.state == STATE_PLACE_CHESS:
+            success = self.ai_make_chess_move()
+            if not success:
+                if self.mode == MODE_LINGJING:
+                    self.finish_battle_no_reward("框", self.current_role == "守御")
+                else:
+                    self.winner = "框"
+                    self.player_won = (self.current_role == "守御")
+                    if self.player_won:
+                        if self.current_role == "守御":
+                            self.qi_count += 1
+                        self.reward_given = True
+                        cleared_chapter = self.current_chapter
+                        cleared_level = self.current_level
+                        self.advance_level_after_clear()
+                        if self.maybe_start_post_win_story(cleared_chapter, cleared_level):
+                            self.ai_action_started_at = None
+                            return
+                    self.state = STATE_GAME_OVER
+
+        self.ai_action_started_at = None
+
+    def get_all_valid_box_anchors(self):
+        valid = []
+        for ax in range(BOARD_COLS - 1):
+            for ay in range(self.board_rows - 1):
+                if self.can_place_2x2_box_at_anchor(ax, ay):
+                    valid.append((ax, ay))
+        return valid
+
+    def is_three_points_in_line(self, p1, p2, p3):
+        x1, y1 = p1
+        x2, y2 = p2
+        x3, y3 = p3
+        return (x2 - x1) * (y3 - y1) == (x3 - x1) * (y2 - y1)
+
+    def would_create_three_box_line(self, new_anchor):
+        if self.rounds >= 5:
+            return False
+
+        anchors = list(self.box_anchors) + [new_anchor]
+        if len(anchors) < 3:
+            return False
+
+        for a, b, c in combinations(anchors, 3):
+            if self.is_three_points_in_line(a, b, c):
+                return True
+        return False
+
+    def choose_center_near_box(self, candidates):
+        if not candidates:
+            return None
+
+        center_x = (BOARD_COLS - 2) / 2
+        center_y = (self.board_rows - 2) / 2
+
+        dist_list = []
+        for ax, ay in candidates:
+            dist = (ax - center_x) ** 2 + (ay - center_y) ** 2
+            dist_list.append((dist, (ax, ay)))
+
+        dist_list.sort(key=lambda x: x[0])
+        top_n = min(6, len(dist_list))
+        near_candidates = [item[1] for item in dist_list[:top_n]]
+        return random.choice(near_candidates)
+
+    def box_average_distance_to_chess(self, anchor):
+        if not self.chess:
+            return 0.0
+
+        ax, ay = anchor
+        box_center_x = ax + 0.5
+        box_center_y = ay + 0.5
+
+        total = 0.0
+        for cx, cy in self.chess:
+            dx = box_center_x - cx
+            dy = box_center_y - cy
+            total += math.sqrt(dx * dx + dy * dy)
+
+        return total / len(self.chess)
+
+    def score_chess_position_toward_five(self, pos):
+        simulated = set(self.chess)
+        simulated.add(pos)
+
+        x, y = pos
+        directions = [(1, 0), (0, 1), (1, 1), (1, -1)]
+        best_len = 1
+        total_len = 0
+        neighbor_count = 0
+
+        for dx, dy in directions:
+            count = 1
+
+            cx, cy = x + dx, y + dy
+            while (cx, cy) in simulated:
+                count += 1
+                cx += dx
+                cy += dy
+
+            cx, cy = x - dx, y - dy
+            while (cx, cy) in simulated:
+                count += 1
+                cx -= dx
+                cy -= dy
+
+            best_len = max(best_len, count)
+            total_len += count
+
+        for nx in range(x - 1, x + 2):
+            for ny in range(y - 1, y + 2):
+                if (nx, ny) == (x, y):
+                    continue
+                if (nx, ny) in simulated:
+                    neighbor_count += 1
+
+        return (best_len, total_len, neighbor_count)
+
+    def get_all_valid_chess_positions(self):
+        return [(x, y) for (x, y) in self.box_cells_all if (x, y) not in self.chess]
+
+    def would_fill_any_box_with_four_chess(self, pos):
+        if self.rounds >= 5:
+            return False
+
+        simulated = set(self.chess)
+        simulated.add(pos)
+
+        for ax, ay in self.box_anchors:
+            cells = self.get_box_cells_by_anchor(ax, ay)
+            if len(cells & simulated) >= 4:
+                return True
+        return False
+
+    def get_all_length5_lines_in_boxes(self):
+        cells = self.box_cells_all
+        directions = [(1, 0), (0, 1), (1, 1), (1, -1)]
+        lines = []
+        seen = set()
+
+        for x, y in cells:
+            for dx, dy in directions:
+                line = tuple((x + i * dx, y + i * dy) for i in range(5))
+                if all(p in cells for p in line):
+                    if line not in seen:
+                        seen.add(line)
+                        lines.append(line)
+        return lines
+
+    def has_five_space_in_boxes(self):
+        return len(self.get_all_length5_lines_in_boxes()) > 0
+
+    def get_line_max_consecutive(self, line, stones):
+        best = 0
+        cur = 0
+        for p in line:
+            if p in stones:
+                cur += 1
+                if cur > best:
+                    best = cur
+            else:
+                cur = 0
+        return best
+
+    def score_move_by_five_space(self, pos):
+        simulated = set(self.chess)
+        simulated.add(pos)
+
+        lines = self.get_all_length5_lines_in_boxes()
+        best_count_on_line = 0
+        best_consecutive = 0
+        total_count_across_lines = 0
+        useful_lines = 0
+
+        for line in lines:
+            if pos not in line:
+                continue
+
+            count = sum(1 for p in line if p in simulated)
+            consecutive = self.get_line_max_consecutive(line, simulated)
+
+            if count > best_count_on_line:
+                best_count_on_line = count
+            if consecutive > best_consecutive:
+                best_consecutive = consecutive
+
+            total_count_across_lines += count
+            useful_lines += 1
+
+        toward_five_score = self.score_chess_position_toward_five(pos)
+
+        return (
+            best_count_on_line,
+            best_consecutive,
+            total_count_across_lines,
+            useful_lines,
+            toward_five_score[0],
+            toward_five_score[1],
+            toward_five_score[2]
+        )
+
+    def score_move_by_three_priority(self, pos):
+        simulated = set(self.chess)
+        simulated.add(pos)
+
+        x, y = pos
+        directions = [(1, 0), (0, 1), (1, 1), (1, -1)]
+
+        exact_three_count = 0
+        exact_four_count = 0
+        best_three_span = 0
+
+        for dx, dy in directions:
+            count = 1
+
+            cx, cy = x + dx, y + dy
+            while (cx, cy) in simulated:
+                count += 1
+                cx += dx
+                cy += dy
+
+            cx, cy = x - dx, y - dy
+            while (cx, cy) in simulated:
+                count += 1
+                cx -= dx
+                cy -= dy
+
+            if count == 3:
+                exact_three_count += 1
+            elif count == 4:
+                exact_four_count += 1
+
+            best_three_span = max(best_three_span, min(count, 3))
+
+        toward_five_score = self.score_chess_position_toward_five(pos)
+
+        return (
+            exact_three_count,
+            -exact_four_count,
+            best_three_span,
+            toward_five_score[0],
+            toward_five_score[1],
+            toward_five_score[2]
+        )
+
+    def ai_make_box_move(self, return_state_after_anim=None, tutorial_mode=False):
+        valid = self.get_all_valid_box_anchors()
+        if not valid:
+            return False
+
+        restricted = [p for p in valid if not self.would_create_three_box_line(p)]
+        if restricted:
+            valid = restricted
+
+        if not self.use_smart_ai():
+            if len(self.box_anchors) == 0:
+                choice = self.choose_center_near_box(valid)
+            else:
+                choice = random.choice(valid)
+        else:
+            if self.chess:
+                scored = []
+                for p in valid:
+                    avg_dist = self.box_average_distance_to_chess(p)
+                    scored.append((avg_dist, random.random(), p))
+                scored.sort(reverse=True)
+                choice = scored[0][2]
+            else:
+                if len(self.box_anchors) == 0:
+                    choice = self.choose_center_near_box(valid)
+                else:
+                    choice = random.choice(valid)
+
+        if choice is None:
+            return False
+
+        ax, ay = choice
+        self.add_2x2_box(ax, ay, return_state_after_anim=return_state_after_anim, tutorial_mode=tutorial_mode)
+        return True
+
+    def ai_make_chess_move(self):
+        valid = self.get_all_valid_chess_positions()
+        if not valid:
+            return False
+
+        restricted = [p for p in valid if not self.would_fill_any_box_with_four_chess(p)]
+        if restricted:
+            valid = restricted
+
+        if not self.use_smart_ai():
+            choice = random.choice(valid)
+        else:
+            if self.has_five_space_in_boxes():
+                scored = []
+                for p in valid:
+                    score = self.score_move_by_five_space(p)
+                    scored.append((score, random.random(), p))
+                scored.sort(reverse=True)
+                choice = scored[0][2]
+            else:
+                scored = []
+                for p in valid:
+                    score = self.score_move_by_three_priority(p)
+                    scored.append((score, random.random(), p))
+                scored.sort(reverse=True)
+                choice = scored[0][2]
+
+        gx, gy = choice
+        self.add_chess(gx, gy)
+        return True
+
+    # ====================== 动画更新 ======================
+
+    def update_box_animation(self):
+        e = time.time() - self.box_anim_start_time
+        self.current_box_frame = min(int(e / BOX_ANIM_DELAY), BOX_TOTAL_FRAMES - 1)
+
+        if self.current_box_frame < len(self.box_frames):
+            self.screen.blit(self.box_frames[self.current_box_frame], self.box_anim_pos)
+
+        if e >= BOX_ANIM_DELAY * BOX_TOTAL_FRAMES:
+            ax, ay = self.waiting_box_pos
+            self.box_anchors.add((ax, ay))
+            self.box_cells_all.update(self.get_box_cells_by_anchor(ax, ay))
+            self.waiting_box_pos = None
+
+            if self.return_state_after_anim == STATE_STORY and self.animation_tutorial_mode:
+                if self.current_story_idx == 4:
+                    self.tutorial_box1_done = True
+                elif self.current_story_idx == 6:
+                    self.tutorial_box2_done = True
+
+                self.state = STATE_STORY
+                self.return_state_after_anim = None
+                self.animation_tutorial_mode = False
+                self.ai_action_started_at = None
+                return
+
+            self.chess_step = 0
+            self.state = STATE_PLACE_CHESS
+            self.return_state_after_anim = None
+            self.animation_tutorial_mode = False
+            self.ai_action_started_at = None
+
+    def update_chess_animation(self):
+        e = time.time() - self.chess_anim_start_time
+
+        current_delay = CHESS_ANIM_DELAY3 if self.current_chapter == CHAPTER_PALACE else CHESS_ANIM_DELAY
+        self.current_chess_frame = min(int(e / current_delay), CHESS_ANIM_FRAMES - 1)
+
+        if self.current_chess_frame < len(self.chess_anim_frames):
+            self.screen.blit(self.chess_anim_frames[self.current_chess_frame], self.chess_anim_pos)
+
+        if e >= current_delay * CHESS_ANIM_FRAMES:
+            self.chess.append(self.waiting_chess_pos)
+            self.waiting_chess_pos = None
+
+            if self.return_state_after_anim == STATE_STORY and self.animation_tutorial_mode:
+                self.tutorial_player_chess_done += 1
+
+                if self.tutorial_player_chess_done >= 2:
+                    self.rounds += 1
+                    self.chess_step = 0
+                else:
+                    self.chess_step = 1
+
+                self.state = STATE_STORY
+                self.return_state_after_anim = None
+                self.animation_tutorial_mode = False
+                self.ai_action_started_at = None
+                self.check_and_apply_game_over()
+                return
+
+            self.chess_step += 1
+
+            if self.chess_step >= 2:
+                self.rounds += 1
+                self.chess_step = 0
+                self.state = STATE_PLACE_BOX
+            else:
+                self.state = STATE_PLACE_CHESS
+
+            self.return_state_after_anim = None
+            self.animation_tutorial_mode = False
+            self.ai_action_started_at = None
+            self.check_and_apply_game_over()
+
+    # ====================== 关卡推进 ======================
+
+    def advance_level_after_clear(self):
+        self.chapter_progress[self.current_chapter] += 1
+        self.mark_finished_flags()
+        self.current_level = self.get_display_level_for_chapter(self.current_chapter)
+
+    def maybe_start_post_win_story(self, cleared_chapter, cleared_level):
+        key = (cleared_chapter, cleared_level)
+        if key in self.post_win_stories:
+            self.current_post_win_story = self.post_win_stories[key]
+            self.current_post_win_story_idx = 0
+            self.state = STATE_POST_WIN_STORY
+            return True
+        return False
+
+    def check_and_apply_game_over(self):
+        if self.reward_given and self.state in [STATE_GAME_OVER, STATE_POST_WIN_STORY]:
+            return True
+
+        decided_winner = None
+
+        if self.check_win_chess():
+            decided_winner = "棋"
+        elif self.rounds > 5:
+            decided_winner = "框"
+
+        if decided_winner is None:
+            if self.mode == MODE_MINGXIANG and self.state == STATE_PLACE_BOX and not self.get_all_valid_box_anchors():
+                decided_winner = "棋"
+            elif self.mode == MODE_MINGXIANG and self.state == STATE_PLACE_CHESS and not self.get_all_valid_chess_positions():
+                decided_winner = "框"
+            else:
+                return False
+
+        self.winner = decided_winner
+
+        if self.mode == MODE_LINGJING:
+            if (self.current_role == "攻伐" and self.winner == "棋") or \
+               (self.current_role == "守御" and self.winner == "框"):
+                self.player_won = True
+            else:
+                self.player_won = False
+            self.state = STATE_GAME_OVER
+            return True
+
+        if self.mode == MODE_MINGXIANG:
+            self.player_won = True
+            self.state = STATE_GAME_OVER
+            return True
+
+        if (self.current_role == "攻伐" and self.winner == "棋") or \
+           (self.current_role == "守御" and self.winner == "框"):
+            self.player_won = True
+        else:
+            self.player_won = False
+
+        if self.player_won:
+            if self.current_role == "攻伐" and self.winner == "棋":
+                self.weather_count += 1
+            elif self.current_role == "守御" and self.winner == "框":
+                self.qi_count += 1
+
+            self.reward_given = True
+
+            cleared_chapter = self.current_chapter
+            cleared_level = self.current_level
+            self.advance_level_after_clear()
+
+            if self.maybe_start_post_win_story(cleared_chapter, cleared_level):
+                return True
+
+        self.state = STATE_GAME_OVER
+        return True
+
+    # ====================== 地图/过渡 ======================
+
+    def cache_current_map_frame(self):
+        ret, f = self.map_cap.read()
+        if not ret:
+            self.map_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, f = self.map_cap.read()
+
+        if ret:
+            f = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
+            f = cv2.resize(f, (SCREEN_WIDTH, SCREEN_HEIGHT))
+            self.transition_map_surface = pygame.surfarray.make_surface(f.transpose(1, 0, 2))
+        else:
+            self.transition_map_surface = None
+
+    def update_map_transition(self):
+        current_time = time.time()
+        elapsed = current_time - self.transition_start_time
+        progress = min(elapsed / TRANSITION_DURATION, 1.0)
+
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        bg_alpha = int(progress * 255)
+        self.draw_background_video(bg_alpha)
+
+        if self.transition_map_surface:
+            scale = 1 + (SCALE_FACTOR - 1) * progress
+            click_x, click_y = self.transition_click_pos
+
+            new_width = int(SCREEN_WIDTH * scale)
+            new_height = int(SCREEN_HEIGHT * scale)
+
+            scaled_map = pygame.transform.smoothscale(self.transition_map_surface, (new_width, new_height))
+
+            offset_x = click_x - (click_x * scale)
+            offset_y = click_y - (click_y * scale)
+
+            map_alpha = int(255 - progress * 255)
+            scaled_map.set_alpha(map_alpha)
+
+            self.screen.blit(scaled_map, (offset_x, offset_y))
+
+        if progress >= 1.0:
+            self.mode = MODE_STORY
+            self.current_chapter = self.transition_target_chapter
+            self.sync_current_level_with_chapter()
+            self.reset_game(keep_mode=True)
+            self.state = STATE_STORY
+            self.switch_music_scene(MUSIC_SCENE_GAME)
+            return
+
+        pygame.display.flip()
+        self.clock.tick(60)
+
+    # ====================== 状态重置 ======================
+
+    def reset_game(self, keep_mode=True):
+        if not keep_mode:
+            self.mode = MODE_STORY
+
+        self.rounds = 1
+        self.winner = None
+        self.box_anchors = set()
+        self.box_cells_all = set()
+        self.chess = []
+        self.chess_step = 0
+        self.ghost_pos = None
+        self.waiting_box_pos = None
+        self.waiting_chess_pos = None
+        self.current_chess_frame = 0
+        self.chess_anim_start_time = 0
+        self.current_box_frame = 0
+        self.box_anim_start_time = 0
+        self.current_story_idx = 0
+        self.current_post_win_story = []
+        self.current_post_win_story_idx = 0
+        self.current_role = None
+        self.ai_role = None
+        self.player_won = None
+        self.reward_given = False
+        self.ai_action_started_at = None
+
+        self.return_state_after_anim = None
+        self.animation_tutorial_mode = False
+        self.tutorial_box1_started = False
+        self.tutorial_box1_done = False
+        self.tutorial_box2_started = False
+        self.tutorial_box2_done = False
+        self.tutorial_player_chess_done = 0
+
+        if self.mode == MODE_MINGXIANG:
+            self.board_rows = DEFAULT_BOARD_ROWS
+
+        self.sync_current_level_with_chapter()
+        self.update_board_params()
+        self.chess_anim_frames = self.load_chess_animation_frames()
+        self.box_frames = self.load_box_animation_frames()
+
+    def restart_current_mode(self):
+        if self.mode == MODE_LINGJING:
+            self.reset_game(keep_mode=True)
+            self.state = STATE_CHOOSE_ROLE
+        elif self.mode == MODE_MINGXIANG:
+            self.reset_game(keep_mode=True)
+            self.state = STATE_MINGXIANG_INFO
+        else:
+            self.reset_game(keep_mode=True)
+            self.state = STATE_MAP
+
+    def enter_lingjing(self):
+        self.mode = MODE_LINGJING
+        self.reset_game(keep_mode=True)
+        self.state = STATE_CHOOSE_ROLE
+        self.switch_music_scene(MUSIC_SCENE_NONE)
+
+    def enter_mingxiang(self):
+        self.mode = MODE_MINGXIANG
+        self.reset_game(keep_mode=True)
+        self.current_role = "双修"
+        self.ai_role = None
+        self.state = STATE_MINGXIANG_INFO
+        self.switch_music_scene(MUSIC_SCENE_NONE)
+
+    # ====================== 事件 ======================
+
+    def handle_events(self):
+        mx, my = pygame.mouse.get_pos()
+
+        life_jianghu_area = 0 <= mx <= SCREEN_WIDTH // 2 + 50 and SCREEN_HEIGHT // 2 - 50 <= my <= SCREEN_HEIGHT
+        street_area = 3 * SCREEN_WIDTH // 4 - 50 <= mx <= SCREEN_WIDTH and SCREEN_HEIGHT // 2 - 50 <= my <= SCREEN_HEIGHT
+        palace_area = SCREEN_WIDTH // 2 - 80 <= mx <= SCREEN_WIDTH // 4 * 3 + 70 and 50 <= my <= SCREEN_HEIGHT // 2 + 10
+
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if e.type == pygame.MOUSEMOTION:
+                mx, my = e.pos
+                gx = (mx - self.BOARD_OFFSET_X) // self.CELL_SIZE
+                gy = (my - self.BOARD_OFFSET_Y) // self.CELL_SIZE
+                if 0 <= gx < BOARD_COLS and 0 <= gy < self.board_rows:
+                    self.ghost_pos = (gx, gy)
+                else:
+                    self.ghost_pos = None
+
+            if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+                mx, my = e.pos
+
+                if self.state == STATE_MINGXIANG_INFO:
+                    if self.mingxiang_ok_rect.collidepoint(mx, my):
+                        self.state = STATE_PLACE_BOX
+                    return
+
+                if self.state == STATE_GAME_OVER:
+                    if self.mode == MODE_STORY:
+                        if self.map_btn_rect.collidepoint(mx, my):
+                            self.reset_game(keep_mode=True)
+                            self.state = STATE_MAP
+                    else:
+                        if self.rematch_btn_rect.collidepoint(mx, my):
+                            self.restart_current_mode()
+                        elif self.back_map_btn_rect.collidepoint(mx, my):
+                            self.mode = MODE_STORY
+                            self.reset_game(keep_mode=True)
+                            self.state = STATE_MAP
+                    return
+
+                if self.state == STATE_STORY and self.is_tutorial_level():
+                    action = self.get_tutorial_story_action()
+
+                    if action == "player_two_chess" and self.tutorial_player_chess_done < 2:
+                        if self.ghost_pos:
+                            gx, gy = self.ghost_pos
+                            if (gx, gy) in self.box_cells_all and (gx, gy) not in self.chess:
+                                self.add_chess(gx, gy, return_state_after_anim=STATE_STORY, tutorial_mode=True)
+                        return
+
+                    if self.can_advance_tutorial_story():
+                        self.current_story_idx += 1
+                    return
+
+                if self.state == STATE_STORY:
+                    self.current_story_idx += 1
+                    return
+
+                if self.state == STATE_POST_WIN_STORY:
+                    self.current_post_win_story_idx += 1
+                    if self.current_post_win_story_idx >= len(self.current_post_win_story):
+                        self.state = STATE_GAME_OVER
+                    return
+
+                if self.state == STATE_CHOOSE_ROLE:
+                    if self.gongfa_btn_rect.collidepoint(mx, my):
+                        self.current_role = "攻伐"
+                        self.ai_role = "守御"
+                        self.state = STATE_PLACE_BOX
+                        self.ai_action_started_at = None
+                    elif self.shouyu_btn_rect.collidepoint(mx, my):
+                        self.current_role = "守御"
+                        self.ai_role = "攻伐"
+                        self.state = STATE_PLACE_BOX
+                        self.ai_action_started_at = None
+                    return
+
+                if self.state == STATE_MAP:
+                    if self.lingjing_rect.collidepoint(mx, my):
+                        self.enter_lingjing()
+                        return
+
+                    if self.mingxiang_rect.collidepoint(mx, my):
+                        self.enter_mingxiang()
+                        return
+
+                    if self.tianding_rect.collidepoint(mx, my):
+                        self.tianding_tip_text = "天顶尚未解锁，敬请期待"
+                        self.tianding_tip_until = time.time() + 2.0
+                        return
+
+                    if life_jianghu_area and not self.life_jianghu_finished:
+                        self.transition_start_time = time.time()
+                        self.transition_click_pos = (mx, my)
+                        self.transition_target_chapter = CHAPTER_LIFE_JIANGHU
+                        self.cache_current_map_frame()
+                        self.state = STATE_MAP_TRANSITION
+                        return
+
+                    if street_area and self.life_jianghu_finished and not self.street_finished:
+                        self.transition_start_time = time.time()
+                        self.transition_click_pos = (mx, my)
+                        self.transition_target_chapter = CHAPTER_STREET
+                        self.cache_current_map_frame()
+                        self.state = STATE_MAP_TRANSITION
+                        return
+
+                    if palace_area and self.street_finished and not self.palace_finished:
+                        self.transition_start_time = time.time()
+                        self.transition_click_pos = (mx, my)
+                        self.transition_target_chapter = CHAPTER_PALACE
+                        self.cache_current_map_frame()
+                        self.state = STATE_MAP_TRANSITION
+                        return
+
+                if self.state in [STATE_PLACE_BOX, STATE_PLACE_CHESS] and self.is_ai_turn():
+                    return
+
+                if not self.ghost_pos:
+                    return
+
+                gx, gy = self.ghost_pos
+
+                if self.state == STATE_PLACE_BOX:
+                    if self.can_place_2x2_box(gx, gy):
+                        self.add_2x2_box(gx, gy)
+
+                elif self.state == STATE_PLACE_CHESS:
+                    if (gx, gy) in self.box_cells_all and (gx, gy) not in self.chess:
+                        self.add_chess(gx, gy)
+
+    # ====================== 主循环 ======================
+
+    def run(self):
+        while True:
+            if self.state == STATE_ANIMATION:
+                self.switch_music_scene(MUSIC_SCENE_ANIMATION)
+                self.update_animation()
+
+            elif self.state == STATE_MAP_TRANSITION:
+                self.update_map_transition()
+
+            elif self.state in (
+                STATE_STORY,
+                STATE_POST_WIN_STORY,
+                STATE_CHOOSE_ROLE,
+                STATE_PLACE_BOX,
+                STATE_PLACE_CHESS,
+                STATE_PLAY_BOX_VIDEO,
+                STATE_PLAY_CHESS_VIDEO,
+                STATE_GAME_OVER,
+                STATE_MINGXIANG_INFO
+            ):
+                if self.mode in [MODE_LINGJING, MODE_MINGXIANG]:
+                    self.switch_music_scene(MUSIC_SCENE_NONE)
+                else:
+                    self.switch_music_scene(MUSIC_SCENE_GAME)
+
+                if self.state not in [STATE_STORY, STATE_POST_WIN_STORY, STATE_CHOOSE_ROLE, STATE_GAME_OVER, STATE_MINGXIANG_INFO]:
+                    self.check_and_apply_game_over()
+
+                if self.state == STATE_STORY:
+                    self.handle_events()
+                    if self.is_tutorial_level():
+                        self.update_tutorial_story_flow()
+                    self.draw_story_dialogue()
+
+                elif self.state == STATE_POST_WIN_STORY:
+                    self.handle_events()
+                    self.draw_post_win_dialogue()
+
+                elif self.state == STATE_CHOOSE_ROLE:
+                    self.handle_events()
+                    self.draw_background_video()
+                    self.draw_role_choose_window()
+
+                elif self.state == STATE_MINGXIANG_INFO:
+                    self.handle_events()
+                    self.draw_mingxiang_info_window()
+
+                elif self.state == STATE_GAME_OVER:
+                    self.handle_events()
+                    self.draw_background_video()
+                    self.draw_grid()
+                    self.draw_boxes()
+                    self.draw_chess()
+                    self.draw_game_over_popup()
+
+                elif self.state == STATE_PLACE_BOX:
+                    self.handle_events()
+                    self.process_ai_turn()
+                    self.draw_background_video()
+                    self.draw_grid()
+                    self.draw_boxes()
+                    self.draw_chess()
+                    self.draw_ghost()
+
+                elif self.state == STATE_PLACE_CHESS:
+                    self.handle_events()
+                    self.process_ai_turn()
+                    self.draw_background_video()
+                    self.draw_grid()
+                    self.draw_boxes()
+                    self.draw_chess()
+                    self.draw_ghost()
+
+                elif self.state == STATE_PLAY_BOX_VIDEO:
+                    self.handle_events()
+                    self.draw_background_video()
+                    self.draw_grid()
+                    self.draw_boxes()
+                    self.draw_chess()
+                    self.update_box_animation()
+
+                    if self.is_tutorial_story_active():
+                        self._draw_dialogue_from_list(
+                            self.chapter_stories[self.current_chapter][self.current_level],
+                            self.current_story_idx,
+                            draw_bg=False
+                        )
+
+                elif self.state == STATE_PLAY_CHESS_VIDEO:
+                    self.handle_events()
+                    self.draw_background_video()
+                    self.draw_grid()
+                    self.draw_boxes()
+                    self.draw_chess()
+                    self.update_chess_animation()
+
+                    if self.is_tutorial_story_active():
+                        if self.current_story_idx == 5:
+                            tip = self.font.render("请在守御内注入两道攻势", True, WHITE)
+                            tip_bg = pygame.Surface((SCREEN_WIDTH, 34), pygame.SRCALPHA)
+                            tip_bg.fill((0, 0, 0, 150))
+                            self.screen.blit(tip_bg, (0, 20))
+                            self.screen.blit(tip, tip.get_rect(center=(SCREEN_WIDTH // 2, 37)))
+
+                        self._draw_dialogue_from_list(
+                            self.chapter_stories[self.current_chapter][self.current_level],
+                            self.current_story_idx,
+                            draw_bg=False
+                        )
+
+                pygame.display.flip()
+
+                if self.using_plain_training_theme():
+                    target_fps = 60
+                else:
+                    _, _, target_fps = self.get_current_bg_config()
+                    if target_fps <= 0:
+                        target_fps = 30
+                self.clock.tick(target_fps)
+
+            elif self.state == STATE_MAP:
+                self.switch_music_scene(MUSIC_SCENE_MAP)
+                self.handle_events()
+                self.update_map()
+                pygame.display.flip()
+                self.clock.tick(60)
+
+            if self.state not in [STATE_ANIMATION, STATE_MAP_TRANSITION]:
+                pygame.display.update()
+
+
+if __name__ == '__main__':
+    warnings.filterwarnings("ignore")
+    random.seed()
+    game = TwoCharGame()
+    game.run()

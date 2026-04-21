@@ -1,0 +1,868 @@
+import pygame
+import sys
+import os
+import cv2
+import math
+import time
+
+# ====================== 打包适配核心函数 ======================
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+# ====================== 游戏常量（9:16 + 棋盘整体缩80%） ======================
+SCREEN_WIDTH = 450
+SCREEN_HEIGHT = 800
+
+# 整体棋盘缩放：80%
+BOARD_SCALE = 0.8
+BASE_CELL_SIZE = 40
+CELL_SIZE = int(BASE_CELL_SIZE * BOARD_SCALE)
+CHESS_SIZE = CELL_SIZE // 3 * 2
+BOX_SIZE = CELL_SIZE  # 框动画尺寸（适配2x2框）
+
+BOARD_COLS = 10
+BOARD_ROWS = 8
+
+BOARD_OFFSET_X = (SCREEN_WIDTH - BOARD_COLS * CELL_SIZE) // 2
+BOARD_OFFSET_Y = (SCREEN_HEIGHT - BOARD_ROWS * CELL_SIZE) // 2 - 20
+
+# 颜色定义
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GRAY  = (200, 200, 200)
+LIGHT_GRAY = (240, 240, 240)
+DARK_GRAY = (150, 150, 150)
+BLACK_FADE = (0, 0, 0, 80)
+ERROR_FADE = (255, 0, 0, 80)
+WHITE_FADE = (255, 255, 255, 80)
+RED = (220, 60, 60)
+DARK_BLUE = (0, 51, 102)  # 深蓝色
+BLACK_BG = (0, 0, 0, 180)  # 对话背景黑色半透明
+
+# 按钮
+BUTTON_WIDTH = 120
+BUTTON_HEIGHT = 40
+BUTTON_GAP = 30
+
+# ====================== 路径配置 ======================
+# 入场动画
+ANIMATION_PATH = r"C:\Users\hongd\Desktop\4C\begin animation.mp4"
+ANIMATION_BGM_PATH = r"C:\Users\hongd\Desktop\4C\begin animation.mp3"  # 入场专属音乐
+SKIP_TEXT = "点击任意位置跳过动画"
+
+# 游戏核心
+GAME_BGM_PATH = r"C:\Users\hongd\Desktop\4C\backmusic1.mp3"  # 游戏/剧情专属音乐
+BACKGROUND_VIDEO_PATH = r"C:\Users\hongd\Desktop\4C\background1.mp4"  # 游戏/剧情背景视频
+BACKGROUND_IMG_BACKUP = r"C:\Users\hongd\Desktop\4C\background.png"
+
+# 棋子动画（16帧）
+CHESS_ANIM_DIR = r"C:\Users\hongd\Desktop\4C\qizi1"  # 棋子动画文件夹
+CHESS_ANIM_FRAMES = 16  # 总帧数
+CHESS_ANIM_DELAY = 0.05  # 每帧停留时间（秒）
+CHESS_FINAL_IMG = r"C:\Users\hongd\Desktop\4C\qizi1.png"  # 棋子最终显示图（备用）
+
+# 框动画
+BOX_FRAMES_DIR = r"C:\Users\hongd\Desktop\4C\kuang1"
+BOX_ANIM_DELAY = 0.08  # 框每帧停留时间
+BOX_TOTAL_FRAMES = 9   # 框总帧数
+
+# 地图相关
+MAP_PATH = r"C:\Users\hongd\Desktop\4C\map.mp4"  # 地图视频
+MAP_BGM_PATH = r"C:\Users\hongd\Desktop\4C\map.wav"  # 地图专属音乐
+
+# 剧情角色图片
+SHIFU_IMG_PATH = r"C:\Users\hongd\Desktop\4C\shifu.png"
+ZHUJUE_IMG_PATH = r"C:\Users\hongd\Desktop\4C\zhujue.png"
+NO_ROLE_IMG = None  # 旁白无角色图
+
+# ====================== BGM配置 ======================
+MIN_VOLUME = 0.8
+MAX_VOLUME = 0.8
+FADE_IN_SEC = 1
+TOTAL_CYCLE_SEC = 150
+
+# 游戏状态
+STATE_ANIMATION = -1    # 入场动画
+STATE_STORY = -3        # 第一关剧情
+STATE_MAP = -2          # 地图界面
+STATE_PLACE_BOX = 0     # 放框（可点击）
+STATE_PLACE_CHESS = 1   # 下棋（可点击）
+STATE_PLAY_BOX_VIDEO = 2# 框动画（不可点击，可移动光标）
+STATE_PLAY_CHESS_VIDEO = 3# 棋子动画（不可点击，可移动光标）
+STATE_GAME_OVER = 4     # 游戏胜利
+
+# 音乐场景标记（用于判断是否需要切换音乐）
+MUSIC_SCENE_ANIMATION = "animation"
+MUSIC_SCENE_GAME = "game"
+MUSIC_SCENE_MAP = "map"
+
+# 地图文字标注
+TEXT_FONT_SIZE = 24
+TEXT_LIFE_JIANGHU = "生死江湖"
+TEXT_STREET = "街巷阡陌"
+TEXT_PALACE = "飘摇皇庭"
+
+class TwoCharGame:
+    def __init__(self):
+        pygame.init()
+        # 初始化混音器（支持3个独立通道）
+        pygame.mixer.init(frequency=44100, size=-16, channels=3, buffer=1024)
+        # 通道分配：0-入场动画音乐 1-游戏/剧情音乐 2-地图音乐
+        self.animation_channel = pygame.mixer.Channel(0)
+        self.game_channel = pygame.mixer.Channel(1)
+        self.map_channel = pygame.mixer.Channel(2)
+        
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        pygame.display.set_caption("二字棋（手机适配）")
+        self.clock = pygame.time.Clock()  # 主时钟，控制全局帧率
+
+        # 字体初始化
+        self.font = pygame.font.SysFont("KaiTi", 20)
+        self.big_font = pygame.font.SysFont("KaiTi", 32)
+        self.text_font = pygame.font.SysFont("KaiTi", TEXT_FONT_SIZE)
+        self.text_font_large_bold = pygame.font.SysFont("KaiTi", TEXT_FONT_SIZE + 3, bold=True)
+        self.story_font = pygame.font.SysFont("KaiTi", 24)  # 剧情字体
+        self.skip_alpha = 255
+
+        # 核心修复：记录当前音乐场景（避免重复切换）
+        self.current_music_scene = None
+
+        # 背景视频
+        self.bg_video_cap = None
+        self.bg_backup_surf = None
+        self.init_background_video()
+
+        # 入场动画（无闪烁+专属音乐）
+        self.animation_cap = None
+        self.animation_skip = False
+        self.animation_surf = None  # 缓存视频帧
+        self.init_animation()
+
+        # 地图视频
+        self.map_cap = None
+        self.map_backup_surf = None
+        self.init_map_video()
+        
+        # 预加载所有音乐资源（避免切换卡顿）
+        self.animation_bgm = self.load_music(ANIMATION_BGM_PATH)
+        self.game_bgm = self.load_music(GAME_BGM_PATH)
+        self.map_bgm = self.load_music(MAP_BGM_PATH)
+
+        # 加载棋子动画帧
+        self.chess_anim_frames = self.load_chess_animation_frames()
+        self.current_chess_frame = 0  # 当前棋子动画帧
+        self.chess_anim_start_time = 0  # 棋子动画开始时间
+        self.chess_anim_pos = (0, 0)    # 棋子动画播放位置
+
+        # 加载框动画帧
+        self.box_frames = self.load_box_animation_frames()
+        self.current_box_frame = 0     # 当前框动画帧
+        self.box_anim_start_time = 0   # 框动画开始时间
+        self.box_anim_pos = (0, 0)     # 框动画播放位置
+
+        # 剧情相关初始化
+        self.role_images = self.load_role_images()
+        self.story_dialogues = [
+            {"text": "天下大势，分久必合，合久必分……", "role": "旁白", "img_path": NO_ROLE_IMG},
+            {"text": "东方的火焰在熊熊燃烧，灾祸在山的对岸逐渐酝酿，江湖再次开始涌动……", "role": "旁白", "img_path": NO_ROLE_IMG},
+            {"text": "爱欲之人，手如执炬，若逆风而行，必有烧手之患。", "role": "师父", "img_path": SHIFU_IMG_PATH},
+            {"text": "徒儿且来，在你下山之前，为师最后教你这盘棋。", "role": "师父", "img_path": SHIFU_IMG_PATH},
+            {"text": "此番我为守御，在二字棋中，守御者先下一道，构建守御围墙。", "role": "师父", "img_path": SHIFU_IMG_PATH},
+            {"text": "你为攻伐，随后你可在围墙中部署两道攻势。", "role": "师父", "img_path": SHIFU_IMG_PATH},
+            {"text": "守御在部署围墙时，随后的围墙至少要有四分之一的边长与已有的围墙结合。", "role": "师父", "img_path": SHIFU_IMG_PATH},
+            {"text": "二字棋一共五轮，在五轮结束之前，若攻伐者能构筑五星连珠的攻势，则攻伐者胜，反之守御者胜。", "role": "师父", "img_path": SHIFU_IMG_PATH},
+            {"text": "此番天下大乱，如今你已习得守御攻伐之法，应当下山去了。至于未来如何，则全靠你的造化，若你以守御胜之，则天地将赐予你一缕地气，若你以攻伐胜之，则将赐予你一缕天气。", "role": "师父", "img_path": SHIFU_IMG_PATH},
+            {"text": "前路任重而道远，莫向外求，但从心觅，切记！切记！", "role": "师父", "img_path": SHIFU_IMG_PATH},
+            {"text": "弟子谨记！", "role": "主角", "img_path": ZHUJUE_IMG_PATH}
+        ]
+        self.current_story_idx = 0  # 当前剧情索引
+
+        # 游戏状态变量
+        self.rounds = 1
+        self.winner = None
+        self.box_anchors = set()
+        self.box_cells_all = set()
+        self.chess = []
+        self.chess_step = 0
+        self.ghost_pos = None  # 光标位置（始终更新）
+        self.waiting_box_pos = None
+        self.waiting_chess_pos = None
+
+        # 按钮位置（返回地图按钮）
+        self.map_btn_rect = pygame.Rect(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT)
+        self.update_button_positions()
+
+        # 初始状态
+        self.state = STATE_ANIMATION
+
+    def update_button_positions(self):
+        """返回地图按钮居中"""
+        self.map_btn_rect.x = (SCREEN_WIDTH - BUTTON_WIDTH) // 2
+        self.map_btn_rect.y = SCREEN_HEIGHT // 2 + 40
+
+    def load_music(self, path):
+        """预加载音乐文件"""
+        try:
+            music = pygame.mixer.Sound(path)
+            print(f"✅ 成功加载音乐：{path}")
+            return music
+        except Exception as e:
+            print(f"❌ 加载音乐失败 {path}：{e}")
+            return None
+
+    def init_background_video(self):
+        """初始化游戏背景视频"""
+        try:
+            self.bg_video_cap = cv2.VideoCapture(BACKGROUND_VIDEO_PATH)
+            if not self.bg_video_cap.isOpened():
+                raise Exception("背景视频无法打开")
+        except Exception as e:
+            print(f"❌ 加载背景视频失败：{e}")
+            self.bg_video_cap = None
+            try:
+                self.bg_backup_surf = pygame.image.load(BACKGROUND_IMG_BACKUP).convert()
+                self.bg_backup_surf = pygame.transform.scale(self.bg_backup_surf, (SCREEN_WIDTH, SCREEN_HEIGHT))
+            except:
+                self.bg_backup_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+                self.bg_backup_surf.fill(WHITE)
+
+    def draw_background_video(self):
+        """绘制游戏背景视频"""
+        if self.bg_video_cap is not None and self.bg_video_cap.isOpened():
+            ret, frame = self.bg_video_cap.read()
+            if not ret:
+                self.bg_video_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = self.bg_video_cap.read()
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame_rgb = cv2.resize(frame_rgb, (SCREEN_WIDTH, SCREEN_HEIGHT))
+            bg_surf = pygame.surfarray.make_surface(frame_rgb.transpose(1, 0, 2))
+        else:
+            bg_surf = self.bg_backup_surf
+        self.screen.blit(bg_surf, (0, 0))
+
+    def init_animation(self):
+        """初始化入场动画（专属音乐+稳定帧率）"""
+        try:
+            self.animation_cap = cv2.VideoCapture(ANIMATION_PATH)
+            if not self.animation_cap.isOpened():
+                self.state = STATE_STORY
+                return
+            
+            # 获取视频实际帧率并设置时钟
+            self.animation_fps = self.animation_cap.get(cv2.CAP_PROP_FPS)
+            if self.animation_fps <= 0 or self.animation_fps > 60:
+                self.animation_fps = 30
+                
+        except Exception as e:
+            print(f"❌ 初始化入场动画失败：{e}")
+            self.state = STATE_STORY
+
+    def init_map_video(self):
+        """初始化地图视频"""
+        try:
+            self.map_cap = cv2.VideoCapture(MAP_PATH)
+            if not self.map_cap.isOpened():
+                raise Exception("地图视频无法打开")
+        except Exception as e:
+            print(f"❌ 加载地图视频失败：{e}")
+            self.map_cap = None
+            try:
+                self.map_backup_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+                self.map_backup_surf.fill(BLACK)
+            except:
+                self.map_backup_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+                self.map_backup_surf.fill(BLACK)
+
+    # ====================== 动画加载 ======================
+    def load_chess_animation_frames(self):
+        """加载棋子16帧动画图片"""
+        frames = []
+        try:
+            for i in range(1, CHESS_ANIM_FRAMES + 1):
+                frame_path = os.path.join(CHESS_ANIM_DIR, f"{i}.png")
+                img = pygame.image.load(frame_path).convert_alpha()
+                # 缩放至棋子尺寸
+                img_scaled = pygame.transform.scale(img, (CELL_SIZE, CELL_SIZE))
+                frames.append(img_scaled)
+            print(f"✅ 成功加载{len(frames)}张棋子动画帧")
+        except Exception as e:
+            print(f"❌ 加载棋子动画失败：{e}")
+            # 备用帧（单张图重复）
+            try:
+                fallback_img = pygame.image.load(CHESS_FINAL_IMG).convert_alpha()
+                fallback_img = pygame.transform.scale(fallback_img, (CELL_SIZE, CELL_SIZE))
+                frames = [fallback_img] * CHESS_ANIM_FRAMES
+            except:
+                # 纯图形备用
+                fallback_surf = pygame.Surface((CELL_SIZE, CELL_SIZE), pygame.SRCALPHA)
+                pygame.draw.circle(fallback_surf, WHITE, (CELL_SIZE//2, CELL_SIZE//2), CELL_SIZE//2)
+                frames = [fallback_surf] * CHESS_ANIM_FRAMES
+        return frames
+
+    def load_box_animation_frames(self):
+        """加载框动画帧"""
+        frames = []
+        try:
+            for i in range(1, BOX_TOTAL_FRAMES + 1):
+                frame_path = os.path.join(BOX_FRAMES_DIR, f"{i}.jpg")
+                img = pygame.image.load(frame_path).convert_alpha()
+                img_scaled = pygame.transform.scale(img, (BOX_SIZE * 2, BOX_SIZE * 2))
+                frames.append(img_scaled)
+            print(f"✅ 成功加载{len(frames)}张框动画帧")
+        except Exception as e:
+            print(f"❌ 加载框动画失败：{e}")
+            fallback_surf = pygame.Surface((BOX_SIZE * 2, BOX_SIZE * 2), pygame.SRCALPHA)
+            pygame.draw.rect(fallback_surf, (200, 200, 200, 180), (0, 0, BOX_SIZE*2, BOX_SIZE*2), 2)
+            frames = [fallback_surf] * BOX_TOTAL_FRAMES
+        return frames
+
+    # ====================== 音乐控制（核心修复：仅场景切换时更新） ======================
+    def switch_music_scene(self, target_scene):
+        """
+        切换音乐场景（核心修复：仅当目标场景≠当前场景时才执行切换）
+        :param target_scene: MUSIC_SCENE_ANIMATION / MUSIC_SCENE_GAME / MUSIC_SCENE_MAP
+        """
+        if self.current_music_scene == target_scene:
+            return  # 场景未变化，不执行任何操作
+        
+        # 停止所有通道音乐（仅在切换场景时执行一次）
+        self.animation_channel.stop()
+        self.game_channel.stop()
+        self.map_channel.stop()
+        
+        # 根据目标场景播放对应音乐
+        if target_scene == MUSIC_SCENE_ANIMATION and self.animation_bgm:
+            self.animation_channel.play(self.animation_bgm, loops=-1)
+            self.animation_channel.set_volume(0.5)
+            print(f"🎵 切换到入场音乐：begin animation.mp3")
+        elif target_scene == MUSIC_SCENE_GAME and self.game_bgm:
+            self.game_channel.play(self.game_bgm, loops=-1)
+            self.game_channel.set_volume(MIN_VOLUME)
+            print(f"🎵 切换到游戏音乐：backmusic1.mp3")
+        elif target_scene == MUSIC_SCENE_MAP and self.map_bgm:
+            self.map_channel.play(self.map_bgm, loops=-1)
+            self.map_channel.set_volume(MIN_VOLUME)
+            print(f"🎵 切换到地图音乐：map.wav")
+        
+        # 更新当前音乐场景标记
+        self.current_music_scene = target_scene
+
+    # ====================== 剧情逻辑 ======================
+    def load_role_images(self):
+        """加载剧情角色图片"""
+        role_imgs = {}
+        # 师父
+        try:
+            shifu_img = pygame.image.load(SHIFU_IMG_PATH).convert_alpha()
+            role_imgs[SHIFU_IMG_PATH] = shifu_img
+        except Exception as e:
+            print(f"❌ 加载师父图片失败：{e}")
+            shifu_fallback = pygame.Surface((100, 150), pygame.SRCALPHA)
+            shifu_fallback.fill((100, 100, 100, 180))
+            role_imgs[SHIFU_IMG_PATH] = shifu_fallback
+        # 主角
+        try:
+            zhujue_img = pygame.image.load(ZHUJUE_IMG_PATH).convert_alpha()
+            role_imgs[ZHUJUE_IMG_PATH] = zhujue_img
+        except Exception as e:
+            print(f"❌ 加载主角图片失败：{e}")
+            zhujue_fallback = pygame.Surface((100, 150), pygame.SRCALPHA)
+            zhujue_fallback.fill((150, 150, 150, 180))
+            role_imgs[ZHUJUE_IMG_PATH] = zhujue_fallback
+        return role_imgs
+
+    def wrap_text(self, text, font, max_width):
+        """文字自动换行"""
+        lines = []
+        current_line = ""
+        for char in text:
+            test_line = current_line + char
+            if font.size(test_line)[0] <= max_width:
+                current_line = test_line
+            else:
+                lines.append(current_line)
+                current_line = char
+        if current_line:
+            lines.append(current_line)
+        return lines
+
+    def draw_story_dialogue(self):
+        """绘制剧情对话"""
+        # 背景视频
+        self.draw_background_video()
+
+        # 剧情结束→进入游戏
+        if self.current_story_idx >= len(self.story_dialogues):
+            self.state = STATE_PLACE_BOX
+            return
+
+        current_dialog = self.story_dialogues[self.current_story_idx]
+        text = current_dialog["text"]
+        img_path = current_dialog["img_path"]
+
+        # 对话背景
+        bg_height = SCREEN_HEIGHT // 5
+        bg_y = SCREEN_HEIGHT - bg_height
+        bg_surf = pygame.Surface((SCREEN_WIDTH, bg_height), pygame.SRCALPHA)
+        bg_surf.fill(BLACK_BG)
+        self.screen.blit(bg_surf, (0, bg_y))
+
+        # 角色图片
+        if img_path is not None and img_path in self.role_images:
+            role_img = self.role_images[img_path]
+            max_w = 300
+            max_h = 450
+            w, h = role_img.get_size()
+            scale = min(max_w / w, max_h / h)
+            new_w = int(w * scale)
+            new_h = int(h * scale)
+            role_img_scaled = pygame.transform.scale(role_img, (new_w, new_h))
+            
+            if img_path == SHIFU_IMG_PATH:
+                img_x = 0
+                img_y = bg_y - new_h
+            elif img_path == ZHUJUE_IMG_PATH:
+                img_x = SCREEN_WIDTH - new_w
+                img_y = bg_y - new_h
+            self.screen.blit(role_img_scaled, (img_x, img_y))
+
+        # 对话文字
+        max_text_width = int(SCREEN_WIDTH * 0.9)
+        lines = self.wrap_text(text, self.story_font, max_text_width)
+        line_height = self.story_font.get_height()
+        total_text_height = line_height * len(lines)
+        start_y = bg_y + (bg_height - total_text_height) // 2
+        for i, line in enumerate(lines):
+            text_surf = self.story_font.render(line, True, WHITE)
+            text_x = (SCREEN_WIDTH - text_surf.get_width()) // 2
+            text_y = start_y + i * line_height
+            self.screen.blit(text_surf, (text_x, text_y))
+
+        # 提示文字
+        tip_surf = self.font.render("点击屏幕继续", True, LIGHT_GRAY)
+        tip_surf.set_alpha(200)
+        tip_x = (SCREEN_WIDTH - tip_surf.get_width()) // 2
+        tip_y = SCREEN_HEIGHT - 30
+        self.screen.blit(tip_surf, (tip_x, tip_y))
+
+    # ====================== 地图界面逻辑 ======================
+    def update_map(self):
+        """处理地图界面"""
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        in_mountain_area = (0 <= mouse_x <= SCREEN_WIDTH//2 and SCREEN_HEIGHT//2 <= mouse_y <= SCREEN_HEIGHT)
+
+        # 绘制地图视频（先绘制避免闪烁）
+        if self.map_cap is not None and self.map_cap.isOpened():
+            ret, frame = self.map_cap.read()
+            if not ret:
+                self.map_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = self.map_cap.read()
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame_rgb = cv2.resize(frame_rgb, (SCREEN_WIDTH, SCREEN_HEIGHT))
+            map_surf = pygame.surfarray.make_surface(frame_rgb.transpose(1, 0, 2))
+        else:
+            map_surf = self.map_backup_surf
+        self.screen.blit(map_surf, (0, 0))
+
+        # 绘制地图文字标注
+        if in_mountain_area:
+            life_jianghu_surf = self.text_font_large_bold.render(TEXT_LIFE_JIANGHU, True, DARK_BLUE)
+        else:
+            life_jianghu_surf = self.text_font.render(TEXT_LIFE_JIANGHU, True, DARK_BLUE)
+        life_jianghu_rect = life_jianghu_surf.get_rect(centerx=SCREEN_WIDTH//4, centery=SCREEN_HEIGHT//2 + 50)
+        self.screen.blit(life_jianghu_surf, life_jianghu_rect)
+
+        street_surf = self.text_font.render(TEXT_STREET, True, DARK_BLUE)
+        street_rect = street_surf.get_rect(centerx=3*SCREEN_WIDTH//4 + 20, centery=SCREEN_HEIGHT//2 + 100)
+        self.screen.blit(street_surf, street_rect)
+
+        palace_surf = self.text_font.render(TEXT_PALACE, True, DARK_BLUE)
+        palace_rect = palace_surf.get_rect(centerx=SCREEN_WIDTH//2 + 120, centery=SCREEN_HEIGHT//4 + 60)
+        self.screen.blit(palace_surf, palace_rect)
+
+        # 处理地图点击事件
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+                x, y = e.pos
+                # 扩大点击区域容错
+                if (0 <= x <= SCREEN_WIDTH//2 + 50) and (SCREEN_HEIGHT//2 - 50 <= y <= SCREEN_HEIGHT):
+                    print("📍 点击生死江湖，进入游戏")
+                    # 重置游戏状态
+                    self.reset_game()
+                    self.state = STATE_PLACE_BOX
+                    return
+
+    # ====================== 游戏核心逻辑 ======================
+    def reset_game(self):
+        """重置游戏状态"""
+        self.rounds = 1
+        self.winner = None
+        self.box_anchors = set()
+        self.box_cells_all = set()
+        self.chess = []
+        self.chess_step = 0
+        self.ghost_pos = None
+        self.waiting_box_pos = None
+        self.waiting_chess_pos = None
+
+        # 动画状态重置
+        self.current_chess_frame = 0
+        self.chess_anim_start_time = 0
+        self.chess_anim_pos = (0, 0)
+        self.current_box_frame = 0
+        self.box_anim_start_time = 0
+        self.box_anim_pos = (0, 0)
+
+        # 剧情标记重置
+        self.current_story_idx = 0
+
+    def update_animation(self):
+        """更新入场动画（无闪烁+专属音乐）"""
+        # 1. 强制清屏，避免闪烁
+        self.screen.fill(WHITE)
+        
+        # 处理事件
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if e.type == pygame.MOUSEBUTTONDOWN:
+                self.animation_skip = True
+
+        # 跳过动画
+        if self.animation_skip:
+            self.state = STATE_STORY
+            return
+
+        # 3. 稳定读取视频帧（控制帧率）
+        ret, frame = self.animation_cap.read()
+        if not ret:
+            self.state = STATE_STORY
+            return
+        
+        # 4. 转换并单次渲染帧
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame_rgb = cv2.resize(frame_rgb, (SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.animation_surf = pygame.surfarray.make_surface(frame_rgb.transpose(1, 0, 2))
+        self.screen.blit(self.animation_surf, (0, 0))
+
+        # 绘制跳过提示（仅绘制一次）
+        ticks = pygame.time.get_ticks()
+        self.skip_alpha = int(100 + 155 * (math.sin(ticks * 0.0015) + 1) / 2)
+        skip_surf = self.font.render(SKIP_TEXT, True, BLACK)
+        skip_surf.set_alpha(self.skip_alpha)
+        skip_rect = skip_surf.get_rect(centerx=SCREEN_WIDTH//2, bottom=SCREEN_HEIGHT - 20)
+        self.screen.blit(skip_surf, skip_rect)
+
+        # 5. 严格控制帧率，避免播放过快
+        self.clock.tick(self.animation_fps)
+
+    def get_box_anchor_from_click(self, gx, gy):
+        """获取框的锚点"""
+        ax = gx if gx < BOARD_COLS-1 else BOARD_COLS-2
+        ay = gy if gy < BOARD_ROWS-1 else BOARD_ROWS-2
+        return ax, ay
+
+    def get_box_cells_by_anchor(self, ax, ay):
+        """获取框覆盖的格子"""
+        return {(ax, ay), (ax+1, ay), (ax, ay+1), (ax+1, ay+1)}
+
+    def calculate_box_edge_overlap(self, cells):
+        """计算框的重叠边数"""
+        cnt = 0
+        for (x, y) in cells:
+            if (x+1, y) in self.box_cells_all: cnt +=1
+            if (x-1, y) in self.box_cells_all: cnt +=1
+            if (x, y+1) in self.box_cells_all: cnt +=1
+            if (x, y-1) in self.box_cells_all: cnt +=1
+        return cnt
+
+    def can_place_2x2_box(self, gx, gy):
+        """判断框是否可放置"""
+        if gx is None or gy is None: return False
+        ax, ay = self.get_box_anchor_from_click(gx, gy)
+        if (ax, ay) in self.box_anchors: return False
+        cells = self.get_box_cells_by_anchor(ax, ay)
+        if cells & self.box_cells_all: return False
+        if not self.box_anchors: return True
+        return self.calculate_box_edge_overlap(cells) >= 2
+
+    def add_2x2_box(self, gx, gy):
+        """开始播放框动画"""
+        ax, ay = self.get_box_anchor_from_click(gx, gy)
+        self.waiting_box_pos = (ax, ay)
+        self.box_anim_pos = (
+            BOARD_OFFSET_X + ax * CELL_SIZE,
+            BOARD_OFFSET_Y + ay * CELL_SIZE
+        )
+        self.box_anim_start_time = time.time()
+        self.current_box_frame = 0
+        self.state = STATE_PLAY_BOX_VIDEO
+
+    def add_chess(self, gx, gy):
+        """开始播放棋子动画"""
+        self.waiting_chess_pos = (gx, gy)
+        self.chess_anim_pos = (
+            BOARD_OFFSET_X + gx * CELL_SIZE,
+            BOARD_OFFSET_Y + gy * CELL_SIZE
+        )
+        self.chess_anim_start_time = time.time()
+        self.current_chess_frame = 0
+        self.state = STATE_PLAY_CHESS_VIDEO
+
+    def update_box_animation(self):
+        """更新框动画"""
+        elapsed = time.time() - self.box_anim_start_time
+        # 计算当前帧
+        self.current_box_frame = min(int(elapsed / BOX_ANIM_DELAY), BOX_TOTAL_FRAMES - 1)
+        
+        # 绘制当前帧
+        if self.current_box_frame < len(self.box_frames):
+            self.screen.blit(self.box_frames[self.current_box_frame], self.box_anim_pos)
+        
+        # 动画播放完成
+        if elapsed >= BOX_ANIM_DELAY * BOX_TOTAL_FRAMES:
+            ax, ay = self.waiting_box_pos
+            self.box_anchors.add((ax, ay))
+            self.box_cells_all.update(self.get_box_cells_by_anchor(ax, ay))
+            self.waiting_box_pos = None
+            self.chess_step = 0
+            self.state = STATE_PLACE_CHESS
+
+    def update_chess_animation(self):
+        """更新棋子16帧动画"""
+        elapsed = time.time() - self.chess_anim_start_time
+        # 计算当前帧（每张0.05秒）
+        self.current_chess_frame = min(int(elapsed / CHESS_ANIM_DELAY), CHESS_ANIM_FRAMES - 1)
+        
+        # 绘制当前帧
+        if self.current_chess_frame < len(self.chess_anim_frames):
+            self.screen.blit(self.chess_anim_frames[self.current_chess_frame], self.chess_anim_pos)
+        
+        # 动画播放完成（停在最后一张）
+        if elapsed >= CHESS_ANIM_DELAY * CHESS_ANIM_FRAMES:
+            self.chess.append(self.waiting_chess_pos)
+            self.waiting_chess_pos = None
+            self.chess_step += 1
+            
+            # 判断是否需要继续下棋或切换回合
+            if self.chess_step >= 2:
+                self.rounds += 1
+                self.state = STATE_PLACE_BOX
+            else:
+                self.state = STATE_PLACE_CHESS
+
+            # 检查胜利
+            if self.check_win_chess():
+                self.winner = "棋"
+                self.state = STATE_GAME_OVER
+            elif self.rounds > 5:
+                self.winner = "框"
+                self.state = STATE_GAME_OVER
+
+    def draw_grid(self):
+        """绘制棋盘网格"""
+        for x in range(BOARD_COLS+1):
+            sx = BOARD_OFFSET_X + x*CELL_SIZE
+            pygame.draw.aaline(self.screen, GRAY, (sx, BOARD_OFFSET_Y), (sx, BOARD_OFFSET_Y + BOARD_ROWS*CELL_SIZE))
+        for y in range(BOARD_ROWS+1):
+            sy = BOARD_OFFSET_Y + y*CELL_SIZE
+            pygame.draw.aaline(self.screen, GRAY, (BOARD_OFFSET_X, sy), (BOARD_OFFSET_X + BOARD_COLS*CELL_SIZE, sy))
+
+    def draw_boxes(self):
+        """绘制已放置的框"""
+        for (ax, ay) in self.box_anchors:
+            x = BOARD_OFFSET_X + ax * CELL_SIZE
+            y = BOARD_OFFSET_Y + ay * CELL_SIZE
+            if len(self.box_frames) > 0:
+                self.screen.blit(self.box_frames[-1], (x, y))
+
+    def draw_chess(self):
+        """绘制已放置的棋子（最后一帧）"""
+        for (gx, gy) in self.chess:
+            x = BOARD_OFFSET_X + gx * CELL_SIZE
+            y = BOARD_OFFSET_Y + gy * CELL_SIZE
+            if len(self.chess_anim_frames) > 0:
+                self.screen.blit(self.chess_anim_frames[-1], (x, y))
+
+    def draw_ghost(self):
+        """绘制光标（始终更新）"""
+        if self.ghost_pos is None:
+            return
+        
+        gx, gy = self.ghost_pos
+        if self.state == STATE_PLACE_BOX or self.state == STATE_PLAY_BOX_VIDEO:
+            # 框光标
+            ok = self.can_place_2x2_box(gx, gy)
+            col = BLACK_FADE if ok else ERROR_FADE
+            ax, ay = self.get_box_anchor_from_click(gx, gy)
+            for (x, y) in self.get_box_cells_by_anchor(ax, ay):
+                rx = BOARD_OFFSET_X + x*CELL_SIZE
+                ry = BOARD_OFFSET_Y + y*CELL_SIZE
+                s = pygame.Surface((CELL_SIZE, CELL_SIZE), pygame.SRCALPHA)
+                s.fill(col)
+                self.screen.blit(s, (rx, ry))
+        elif self.state == STATE_PLACE_CHESS or self.state == STATE_PLAY_CHESS_VIDEO:
+            # 棋子光标
+            ok = (gx, gy) in self.box_cells_all and (gx, gy) not in self.chess
+            col = WHITE_FADE if ok else ERROR_FADE
+            cx = BOARD_OFFSET_X + gx*CELL_SIZE + CELL_SIZE//2
+            cy = BOARD_OFFSET_Y + gy*CELL_SIZE + CELL_SIZE//2
+            r = CELL_SIZE//3
+            s = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
+            pygame.draw.circle(s, col, (r, r), r)
+            self.screen.blit(s, (cx - r, cy - r))
+
+    def draw_info(self):
+        """绘制游戏信息"""
+        by = BOARD_OFFSET_Y + BOARD_ROWS*CELL_SIZE + 5
+        txt = f"轮次：{self.rounds}/5 | "
+        if self.state == STATE_PLACE_BOX or self.state == STATE_PLAY_BOX_VIDEO:
+            txt += "当前：放框"
+        else:
+            txt += f"当前：下棋（{self.chess_step}/2）"
+        surf = self.font.render(txt, True, BLACK)
+        self.screen.blit(surf, surf.get_rect(centerx=SCREEN_WIDTH//2, y=by))
+
+    def check_win_chess(self):
+        """检查棋子是否连成5子"""
+        dirs = [(1,0), (0,1), (1,1), (1,-1)]
+        for (x, y) in self.chess:
+            for dx, dy in dirs:
+                count = 1
+                # 正向检查
+                for i in range(1, 5):
+                    if (x + dx*i, y + dy*i) in self.chess:
+                        count += 1
+                    else:
+                        break
+                # 反向检查
+                for i in range(1, 5):
+                    if (x - dx*i, y - dy*i) in self.chess:
+                        count += 1
+                    else:
+                        break
+                if count >= 5:
+                    return True
+        return False
+
+    def draw_game_over_popup(self):
+        """胜利弹窗"""
+        mask = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        mask.fill((0,0,0,140))
+        self.screen.blit(mask, (0,0))
+        w, h = 300, 200
+        rect = pygame.Rect((SCREEN_WIDTH-w)//2, (SCREEN_HEIGHT-h)//2, w, h)
+        pygame.draw.rect(self.screen, WHITE, rect)
+        pygame.draw.rect(self.screen, BLACK, rect, 2)
+        txt = self.big_font.render(f"{self.winner} 胜利！", True, RED)
+        self.screen.blit(txt, txt.get_rect(center=(SCREEN_WIDTH//2, rect.y+50)))
+
+        mx, my = pygame.mouse.get_pos()
+        # 返回地图按钮
+        c1 = LIGHT_GRAY if not self.map_btn_rect.collidepoint(mx, my) else DARK_GRAY
+        pygame.draw.rect(self.screen, c1, self.map_btn_rect)
+        pygame.draw.rect(self.screen, BLACK, self.map_btn_rect, 2)
+        t1 = self.font.render("返回地图", True, BLACK)
+        self.screen.blit(t1, t1.get_rect(center=self.map_btn_rect.center))
+
+    def handle_events(self):
+        """处理事件（始终更新光标）"""
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            
+            # 始终更新光标位置
+            if e.type == pygame.MOUSEMOTION:
+                mx, my = e.pos
+                # 转换为棋盘坐标
+                gx = (mx - BOARD_OFFSET_X) // CELL_SIZE
+                gy = (my - BOARD_OFFSET_Y) // CELL_SIZE
+                # 边界检查
+                if 0 <= gx < BOARD_COLS and 0 <= gy < BOARD_ROWS:
+                    self.ghost_pos = (gx, gy)
+                else:
+                    self.ghost_pos = None
+            
+            # 仅在可点击状态处理点击
+            if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+                mx, my = e.pos
+                
+                # 胜利弹窗点击
+                if self.state == STATE_GAME_OVER:
+                    if self.map_btn_rect.collidepoint(mx, my):
+                        self.reset_game()
+                        self.state = STATE_MAP
+                    return
+                
+                # 剧情点击
+                if self.state == STATE_STORY:
+                    self.current_story_idx += 1
+                    return
+                
+                # 仅在放框/下棋状态处理游戏点击
+                if self.ghost_pos is None:
+                    return
+                
+                gx, gy = self.ghost_pos
+                if self.state == STATE_PLACE_BOX:
+                    if self.can_place_2x2_box(gx, gy):
+                        self.add_2x2_box(gx, gy)
+                elif self.state == STATE_PLACE_CHESS:
+                    if (gx, gy) in self.box_cells_all and (gx, gy) not in self.chess:
+                        self.add_chess(gx, gy)
+
+    # ====================== 主循环（核心修复：仅场景切换时更新音乐） ======================
+    def run(self):
+        """游戏主循环"""
+        while True:
+            # 根据当前状态判断音乐场景（仅切换时更新）
+            if self.state == STATE_ANIMATION:
+                self.switch_music_scene(MUSIC_SCENE_ANIMATION)
+                self.update_animation()
+            elif self.state == STATE_STORY or self.state in [STATE_PLACE_BOX, STATE_PLACE_CHESS, 
+                                                             STATE_PLAY_BOX_VIDEO, STATE_PLAY_CHESS_VIDEO, STATE_GAME_OVER]:
+                self.switch_music_scene(MUSIC_SCENE_GAME)
+                if self.state == STATE_STORY:
+                    self.handle_events()  # 处理剧情点击
+                    self.draw_story_dialogue()
+                else:
+                    # 游戏界面逻辑
+                    self.handle_events()  # 处理事件（始终更新光标）
+                    self.draw_background_video()  # 绘制背景
+                    self.draw_grid()  # 绘制棋盘
+                    self.draw_boxes()  # 绘制已放置的框
+                    self.draw_chess()  # 绘制已放置的棋子
+                    self.draw_ghost()  # 绘制光标
+                    self.draw_info()  # 绘制游戏信息
+
+                    # 播放框动画
+                    if self.state == STATE_PLAY_BOX_VIDEO:
+                        self.update_box_animation()
+                    # 播放棋子动画
+                    elif self.state == STATE_PLAY_CHESS_VIDEO:
+                        self.update_chess_animation()
+                    # 胜利弹窗
+                    elif self.state == STATE_GAME_OVER:
+                        self.draw_game_over_popup()
+            elif self.state == STATE_MAP:
+                self.switch_music_scene(MUSIC_SCENE_MAP)
+                self.screen.fill(WHITE)
+                self.update_map()
+
+            # 单次屏幕更新，避免闪烁
+            pygame.display.flip()
+            # 全局帧率控制
+            self.clock.tick(60)
+
+if __name__ == '__main__':
+    game = TwoCharGame()
+    game.run()
